@@ -1,0 +1,73 @@
+* overview
+
+  [[http://www.gnu.org/software/emacs/][emacs]] is a text editor.  an extensible one.  it is mainly used for
+  coding, but it can also do anything else.  emacs includes a diary
+  which can be used to keep track of which things were done on which
+  days.
+
+  [[https://github.com/ianxm/emacs-tracker][tracker.el]] adds to emacs the capability to generate tables and
+  charts from the personal metrics data found in your diary entries.
+
+  this is a port of [[https://github.com/ianxm/tracker][tracker]] from haxe to elisp.
+
+* usage
+
+** entering metrics data
+
+   metrics entries are regular diary entries so they can be created by
+   updating the diary in the normal way, but diary entries that aren't
+   in a certain format will be ignored by tracker.  consider using
+   abbrev mode in diary mode and setting abbreviations for your
+   metrics to save yourself a few keystrokes.
+
+*** diary entry format
+
+   emacs is very loose on diary entry formatting, but entries that
+   tracker.el uses must look like:
+
+#+BEGIN_SRC
+   [date] [metric name] [value]
+#+END_SRC
+
+   where,
+     `[date]' must be formatted as yyyy-mm-dd
+     `[metric name]' is any string
+     `[value]' is a number (integer or decimal)
+
+   you can set the default date format to yyyy-mm-dd with this line in
+   your init file:
+
+#+BEGIN_SRC
+   (calendar-set-date-style 'iso)
+#+END_SRC
+
+** reporting
+
+   tracker.el provides several ways to view the metrics data in your
+   diary.
+
+*** list
+
+#+BEGIN_SRC
+    M-x tracker-list
+#+END_SRC
+
+*** table
+
+#+BEGIN_SRC
+    M-x tracker-table [metric-name] [date-grouping] [aggregator]
+#+END_SRC
+
+*** graph
+
+    the graph commands depend on gnuplot, so gnuplot must be installed
+    on your system and you'll need the gnuplot emacs package.
+
+#+BEGIN_SRC
+    M-x tracker-graph [metric-name] [date-grouping] [aggregator]
+#+END_SRC
+
+*** streaks
+*** bursts
+*** cal
+*** records
