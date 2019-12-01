@@ -86,21 +86,21 @@ the next time it is needed."
 This reads the diary file and fills in `tracker-metric-list' if
 it is nil."
   (when (not tracker-metric-index)
-    (let (metrics
-          existing-metric)
-      (defun tracker--list-action (date name _value)
-        (setq existing-metric (plist-get metrics name))
-        (if (not existing-metric)
-            (setq metrics (plist-put metrics
-                                     name
-                                     (list name 1 date date)))
-          (setcar (nthcdr 1 existing-metric) (1+ (nth 1 existing-metric)))
-          (setcar (nthcdr 2 existing-metric) (tracker--min-date (nth 2 existing-metric) date))
-          (setcar (nthcdr 3 existing-metric) (tracker--max-date (nth 3 existing-metric) date))))
+    (let* (metrics
+           existing-metric
+           (list-action (lambda (date name _value)
+                          (setq existing-metric (plist-get metrics name))
+                          (if (not existing-metric)
+                              (setq metrics (plist-put metrics
+                                                       name
+                                                       (list name 1 date date)))
+                            (setcar (nthcdr 1 existing-metric) (1+ (nth 1 existing-metric)))
+                            (setcar (nthcdr 2 existing-metric) (tracker--min-date (nth 2 existing-metric) date))
+                            (setcar (nthcdr 3 existing-metric) (tracker--max-date (nth 3 existing-metric) date))))))
 
       ;; read the diary file, fill `metrics' plist with "name -> (name count first last)"
       (tracker--process-diary (lambda (_date _name) t) ; don't filter out any valid entries
-                              'tracker--list-action)
+                              list-action)
 
       ;; get the property values from the `metrics' plist
       (let ((metric-iter metrics))
@@ -121,29 +121,18 @@ This reads the diary file."
 
   (tracker--load-index)
 
-  (let ((buffer (get-buffer-create "*Tracker Output*")))
-    (set-buffer buffer)
-    (read-only-mode -1)
-    (erase-buffer)
-
-    ;; write the table
-    (insert "| metric | count | first | last | days |\n")
-    (insert "|--\n")
-    (dolist (metric tracker-metric-index)
-      (insert (format "| %s | %s | %s | %s | %s |\n"
-                      (nth 0 metric)
-                      (nth 1 metric)
-                      (format-time-string "%F" (nth 2 metric))
-                      (format-time-string "%F" (nth 3 metric))
-                      (1+ (- (time-to-days (nth 3 metric))
-                         (time-to-days (nth 2 metric)))))))
-    (goto-char (point-min))
-    (orgtbl-mode t)
-    (org-ctrl-c-ctrl-c)
-
-    ;; show output buffer
-    (read-only-mode 1)
-    (set-window-buffer (selected-window) buffer)))
+  (let ((write-table-fcn (lambda ()
+                           (insert "| metric | count | first | last | days |\n") ; header
+                           (insert "|--\n")
+                           (dolist (metric tracker-metric-index)
+                             (insert (format "| %s | %s | %s | %s | %s |\n"      ; data
+                                             (nth 0 metric)
+                                             (nth 1 metric)
+                                             (format-time-string "%F" (nth 2 metric))
+                                             (format-time-string "%F" (nth 3 metric))
+                                             (1+ (- (time-to-days (nth 3 metric))
+                                                    (time-to-days (nth 2 metric))))))))))
+    (tracker--write-tracker-output write-table-fcn)))
 
 (defvar tracker-date-grouping-options
   '(day week month year full))
@@ -192,7 +181,7 @@ This reads the diary file."
       ;; return next-date
       next-date)))
 
-(defun tracker--val-to-bin (value value-transform date-grouping)
+(defun tracker--val-to-bin (value value-transform)
   ""
   (cond
    ((eq value-transform 'count) 1)
@@ -216,6 +205,8 @@ names."
 
 The VALUE-TRANSFORM and DATE-GROUPING are needed to determine how
 to transform the value."
+  ;; TODO handle partial bin (if current date is first or last and falls within the bin)
+  ;; TODO consider looking up days in the particular month
   (let ((bin-duration (cond
                        ((eq date-grouping 'day) 1.0)
                        ((eq date-grouping 'week) 7.0)
@@ -255,19 +246,17 @@ to transform the value."
            (today-bin (tracker--date-to-bin today date-grouping))
            (full-span (and (eq date-grouping 'full)
                            (- (time-to-days today) (time-to-days first-date))))
-           date-bin found-value)
+           date-bin found-value
+           (table-filter-fcn (lambda (_date name)
+                           (eq name metric-name)))
+           (table-action-fcn (lambda (date _name value)
+                                    (setq date-bin (tracker--date-to-bin date date-grouping)
+                                          found-value (gethash date-bin bin-data))
+                                    (if found-value
+                                        (puthash date-bin (+ found-value (tracker--val-to-bin value value-transform)) bin-data)
+                                      (puthash date-bin (tracker--val-to-bin value value-transform) bin-data)))))
 
-      ;; read diary file, filtering for the entries we're interested in
-      (defun tracker--table-filter (_date name)
-        (eq name metric-name))
-      (defun tracker--table-action (date name value)
-        (setq date-bin (tracker--date-to-bin date date-grouping)
-              found-value (gethash date-bin bin-data))
-        (if found-value
-            (puthash date-bin (+ found-value (tracker--val-to-bin value value-transform date-grouping)) bin-data)
-          (puthash date-bin (tracker--val-to-bin value value-transform date-grouping) bin-data)))
-
-      (tracker--process-diary 'tracker--table-filter 'tracker--table-action)
+      (tracker--process-diary table-filter-fcn table-action-fcn)
 
       ;; fill gaps
       (unless (eq date-grouping 'full)
@@ -287,34 +276,36 @@ to transform the value."
                    metric-name
                    (replace-regexp-in-string "-" " " (symbol-name value-transform))
                    (tracker--bin-to-val (cdar sorted-bin-data) value-transform date-grouping full-span))
-        (let ((buffer (get-buffer-create "*Tracker Output*")))
-          (set-buffer buffer)
-          (read-only-mode -1)
-          (erase-buffer)
+        (let ((write-table-fcn (lambda ()
+                                 (insert (format "| %s | %s %s |\n" ; header
+                                                 date-grouping
+                                                 metric-name
+                                                 (replace-regexp-in-string "-" " " (symbol-name value-transform))))
+                                 (insert "|--\n")
+                                 (dolist (bin sorted-bin-data)
+                                   (insert (format "| %s | %s |\n"  ; data
+                                                   (tracker--format-bin (car bin) date-grouping)
+                                                   (tracker--bin-to-val (cdr bin) value-transform date-grouping full-span)))))))
+          (tracker--write-tracker-output write-table-fcn))))))
 
-          ;; write the metric name
-          (insert (format "%s %s by %s\n\n"
-                          metric-name
-                          (replace-regexp-in-string "-" " " (symbol-name value-transform))
-                          date-grouping))
+(defun tracker--write-tracker-output (table-fcn)
+  "Write tracker output to the output buffer.
+This function handles the output buffer and calls TABLE-FCN to
+write the table."
+  (let ((buffer (get-buffer-create "*Tracker Output*")))
+    (set-buffer buffer)
+    (read-only-mode -1)
+    (erase-buffer)
 
-          ;; write the table
-          (insert (format "| %s | value |\n" date-grouping))
-          (insert "|--\n")
-          (dolist (bin sorted-bin-data)
-            (insert (format "| %s | %s |\n"
-                            (tracker--format-bin (car bin) date-grouping)
-                            (tracker--bin-to-val (cdr bin) value-transform date-grouping full-span))))
+    (funcall table-fcn)
 
-          (goto-char (point-min))
-          (forward-line 2)
-          (orgtbl-mode t)
-          (org-ctrl-c-ctrl-c)
+    (goto-char (point-min))
+    (orgtbl-mode t)
+    (org-ctrl-c-ctrl-c)
 
-          ;; show output buffer
-          (read-only-mode 1)
-          (set-window-buffer (selected-window) buffer))
-        ))))
+    ;; show output buffer
+    (read-only-mode 1)
+    (set-window-buffer (selected-window) buffer)))
 
 (provide 'tracker)
 
