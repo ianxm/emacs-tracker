@@ -31,6 +31,7 @@
 ;;; Code:
 
 (require 'seq)
+(require 'timezone)
 
 (defmacro tracker--min-date (d1 d2)
   "Return the earlier of the given dates D1 and D2."
@@ -142,7 +143,7 @@ This reads the diary file."
 
 
 (defun tracker--date-to-bin (date date-grouping)
-  "Return the date at the start of the DATE-GROUPING containing DATE."
+  "Return the start date of the bin containing DATE of size DATE-GROUPING."
   (if (eq date-grouping 'full)
       'full
     (let ((date-fields (decode-time date))
@@ -157,7 +158,7 @@ This reads the diary file."
                    (nth 5 date-fields)))))
 
 (defun tracker--date-to-next-bin (date date-grouping)
-  "Return the date at the start of the DATE-GROUPING following the one that starts with DATE."
+  "Return the start date at the bin following the bin containing DATE of size DATE-GROUPING."
   (if (eq date-grouping 'full)
       'full
     (let* ((date-fields (decode-time date))
@@ -182,7 +183,8 @@ This reads the diary file."
       next-date)))
 
 (defun tracker--val-to-bin (value value-transform)
-  ""
+  "Convert the VALUE to be stored for the bin based on VALUE-TRANSFORM.
+Either save the total value or a count of occurrences."
   (cond
    ((eq value-transform 'count) 1)
    ((eq value-transform 'percent) 1)
@@ -199,20 +201,47 @@ names."
        ((eq date-grouping 'month) (format-time-string "%Y-%m" date))
        ((eq date-grouping 'year) (format-time-string "%Y" date))))
 
+(defun tracker--trim-duration (span bin-start first-date last-date)
+  "Trim the given duration if it falls outside of first and last dates.
 
-(defun tracker--bin-to-val (value value-transform date-grouping full-span)
+If part of the bin SPAN days long and starting at BIN-START falls
+outside of FIRST-DATE or LAST-DATE, then trim it to include the
+days within the bin and inside of FIRST-DATE and LAST-DATE."
+  (let ((bin-end (time-add bin-start (seconds-to-time (* span 86400)))))
+    (cond
+     ((time-less-p bin-start first-date) ; bin starts before first occurrence
+      (float (max 0
+                  (- (time-to-days bin-end)
+                     (time-to-days first-date)))))
+     ((time-less-p last-date bin-end)    ; bin ends after last occurrence
+      (float (1+ (- (time-to-days last-date)
+                    (time-to-days bin-start)))))
+     (t
+      (float span)))))
+
+(defun tracker--days-of-month (date)
+  "Find the number of days in the month containing DATE.  This depends on `timezeone'."
+  (let ((date-fields (decode-time date)))
+    (timezone-last-day-of-month (nth 4 date-fields) (nth 5 date-fields))))
+
+(defun tracker--bin-to-val (value
+                            value-transform date-grouping
+                            bin-date
+                            first-date first-date-bin
+                            today today-bin)
   "Transform and format the bin VALUE into the value used in reporting.
 
 The VALUE-TRANSFORM and DATE-GROUPING are needed to determine how
-to transform the value."
-  ;; TODO handle partial bin (if current date is first or last and falls within the bin)
-  ;; TODO consider looking up days in the particular month
+to transform the value.  BIN-DATE, FIRST-DATE, FIRST-DATE-BIN,
+TODAY, TODAY-BIN are all needed to determine the number of days
+in the current bin."
   (let ((bin-duration (cond
                        ((eq date-grouping 'day) 1.0)
-                       ((eq date-grouping 'week) 7.0)
-                       ((eq date-grouping 'month) 30.0)
-                       ((eq date-grouping 'year) 365.0)
-                       ((eq date-grouping 'full) (float full-span)))))
+                       ((eq date-grouping 'week) (tracker--trim-duration 7 bin-date first-date today))
+                       ((eq date-grouping 'month) (tracker--trim-duration (tracker--days-of-month bin-date) bin-date first-date today))
+                       ((eq date-grouping 'year) (tracker--trim-duration 365 bin-date first-date today))
+                       ((eq date-grouping 'full) (float (- (time-to-days today)
+                                                           (time-to-days first-date)))))))
     (cond
      ((eq value-transform 'total) value)
      ((eq value-transform 'count) value)
@@ -244,8 +273,6 @@ to transform the value."
            (first-date-bin (tracker--date-to-bin first-date date-grouping))
            (today (tracker--string-to-date (format-time-string "%F")))
            (today-bin (tracker--date-to-bin today date-grouping))
-           (full-span (and (eq date-grouping 'full)
-                           (- (time-to-days today) (time-to-days first-date))))
            date-bin found-value
            (table-filter-fcn (lambda (_date name)
                            (eq name metric-name)))
@@ -275,7 +302,10 @@ to transform the value."
           (message "Overall %s %s: %s"
                    metric-name
                    (replace-regexp-in-string "-" " " (symbol-name value-transform))
-                   (tracker--bin-to-val (cdar sorted-bin-data) value-transform date-grouping full-span))
+                   (tracker--bin-to-val (cdar sorted-bin-data) value-transform date-grouping
+                                        (cddr sorted-bin-data)
+                                        first-date first-date-bin
+                                        today today-bin))
         (let ((write-table-fcn (lambda ()
                                  (insert (format "| %s | %s %s |\n" ; header
                                                  date-grouping
@@ -285,7 +315,10 @@ to transform the value."
                                  (dolist (bin sorted-bin-data)
                                    (insert (format "| %s | %s |\n"  ; data
                                                    (tracker--format-bin (car bin) date-grouping)
-                                                   (tracker--bin-to-val (cdr bin) value-transform date-grouping full-span)))))))
+                                                   (tracker--bin-to-val (cdr bin) value-transform date-grouping
+                                                                        (car bin)
+                                                                        first-date first-date-bin
+                                                                        today today-bin)))))))
           (tracker--write-tracker-output write-table-fcn))))))
 
 (defun tracker--write-tracker-output (table-fcn)
