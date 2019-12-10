@@ -132,7 +132,10 @@ This reads the diary file."
                                              (format-time-string "%F" (nth 2 metric))
                                              (format-time-string "%F" (nth 3 metric))
                                              (1+ (- (time-to-days (nth 3 metric))
-                                                    (time-to-days (nth 2 metric))))))))))
+                                                    (time-to-days (nth 2 metric)))))))
+                           (goto-char (point-min))
+                           (orgtbl-mode t)
+                           (org-ctrl-c-ctrl-c))))
     (tracker--write-tracker-output write-table-fcn)))
 
 (defvar tracker-date-grouping-options
@@ -190,16 +193,13 @@ Either save the total value or a count of occurrences."
    ((eq value-transform 'percent) 1)
    (t value)))
 
-(defun tracker--format-bin (date date-grouping)
-  "Format the bin start DATE to the bin name used in reporting.
-
-Using the DATE-GROUPING we can eliminate redundant info from bin
-names."
+(defun tracker--format-bin (date-grouping)
+  "Get the format string for the the bin based on the DATE-GROUPING."
   (cond
-       ((eq date-grouping 'day) (format-time-string "%F" date))
-       ((eq date-grouping 'week) (format-time-string "%F" date))
-       ((eq date-grouping 'month) (format-time-string "%Y-%m" date))
-       ((eq date-grouping 'year) (format-time-string "%Y" date))))
+       ((eq date-grouping 'day) "%Y-%m-%d")
+       ((eq date-grouping 'week) "%Y-%m-%d")
+       ((eq date-grouping 'month) "%Y-%m")
+       ((eq date-grouping 'year) "%Y")))
 
 (defun tracker--trim-duration (span bin-start first-date last-date)
   "Trim the given duration if it falls outside of first and last dates.
@@ -226,15 +226,12 @@ days within the bin and inside of FIRST-DATE and LAST-DATE."
 
 (defun tracker--bin-to-val (value
                             value-transform date-grouping
-                            bin-date
-                            first-date first-date-bin
-                            today today-bin)
+                            bin-date first-date today)
   "Transform and format the bin VALUE into the value used in reporting.
 
 The VALUE-TRANSFORM and DATE-GROUPING are needed to determine how
-to transform the value.  BIN-DATE, FIRST-DATE, FIRST-DATE-BIN,
-TODAY, TODAY-BIN are all needed to determine the number of days
-in the current bin."
+to transform the value.  BIN-DATE, FIRST-DATE, TODAY are all
+needed to determine the number of days in the current bin."
   (let ((bin-duration (cond
                        ((eq date-grouping 'day) 1.0)
                        ((eq date-grouping 'week) (tracker--trim-duration 7 bin-date first-date today))
@@ -251,6 +248,66 @@ in the current bin."
      ((eq value-transform 'per-month) (format "%.1f" (* value (/ 30 bin-duration))))
      ((eq value-transform 'per-year) (format "%.1f" (* value (/ 365 bin-duration)))))))
 
+(defun tracker--bin-metric-data (metric-name date-grouping value-transform today)
+  "Read the requested metric data from the diary.
+Only keep entries for METRIC-NAME.  Apply DATE-GROUPING and
+VALUE-TRANSFORM.  Fill gaps ending at TODAY.  Return the sorted
+bin data as (list (date . pretransformed-value))."
+  (let* ((bin-data (make-hash-table :test 'equal))
+         (first-date (nth 2 (nth 0 (seq-filter (lambda (item) (eq (car item) metric-name)) tracker-metric-index))))
+         (first-date-bin (tracker--date-to-bin first-date date-grouping))
+         (today-bin (tracker--date-to-bin today date-grouping))
+         date-bin found-value
+         (table-filter-fcn (lambda (_date name)
+                             (eq name metric-name)))
+         (table-action-fcn (lambda (date _name value)
+                             (setq date-bin (tracker--date-to-bin date date-grouping)
+                                   found-value (gethash date-bin bin-data))
+                             (if found-value
+                                 (puthash date-bin (+ found-value (tracker--val-to-bin value value-transform)) bin-data)
+                               (puthash date-bin (tracker--val-to-bin value value-transform) bin-data))))
+         sorted-bin-data)
+
+    (tracker--process-diary table-filter-fcn table-action-fcn)
+
+    ;; fill gaps
+    (unless (eq date-grouping 'full)
+      (let ((current-date-bin first-date-bin))
+        (while (time-less-p current-date-bin today-bin)
+          (setq current-date-bin (tracker--date-to-next-bin current-date-bin date-grouping)) ; increment to next bin
+          (unless (gethash current-date-bin bin-data)
+            (puthash current-date-bin 0 bin-data)))))
+
+    ;; convert to alist and sort
+    (maphash (lambda (key value) (setq sorted-bin-data (cons (cons key value) sorted-bin-data))) bin-data)
+    (setq sorted-bin-data (sort sorted-bin-data (lambda (a b) (time-less-p (car a) (car b)))))
+
+    ;; apply value transform (old cdr was count or total, new cdr is requested value transform)
+    (dolist (bin sorted-bin-data)
+      (setcdr bin (tracker--bin-to-val (cdr bin) value-transform date-grouping
+                                       (car bin) first-date today)))
+    sorted-bin-data))
+
+(defun tracker--write-tracker-output (output-fcn)
+  "Write tracker output to the output buffer.
+This function handles the output buffer and calls OUTPUT-FCN to
+write the table."
+  (let ((buffer (get-buffer-create "*Tracker Output*")))
+    (set-buffer buffer)
+    (read-only-mode -1)
+    (erase-buffer)
+
+    (funcall output-fcn)
+
+    ;; show output buffer
+    (read-only-mode 1)
+    (set-window-buffer (selected-window) buffer)))
+
+(defun tracker--check-gnuplot-exists ()
+  "Check if gnuplot is installed on the system."
+  (unless (eq 0 (call-process-shell-command "gnuplot --version"))
+    (error "Cannot find gnuplot")))
+
 (defun tracker-table ()
   "Get a tabular view of the requested metric."
   (interactive)
@@ -259,7 +316,7 @@ in the current bin."
   (tracker--load-index)
 
   (let ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
-        (bin-data (make-hash-table :test 'equal))
+        (today (tracker--string-to-date (format-time-string "%F")))
         metric-name date-grouping value-transform
         sorted-bin-data)
 
@@ -269,76 +326,82 @@ in the current bin."
           value-transform (intern (completing-read "Value transform: " tracker-value-transform-options nil t nil nil "total")))
     ;; (message "params: %s %s %s" date-grouping value-transform metric-name)
 
-    (let* ((first-date (nth 2 (nth 0 (seq-filter (lambda (item) (eq (car item) metric-name)) tracker-metric-index))))
-           (first-date-bin (tracker--date-to-bin first-date date-grouping))
-           (today (tracker--string-to-date (format-time-string "%F")))
-           (today-bin (tracker--date-to-bin today date-grouping))
-           date-bin found-value
-           (table-filter-fcn (lambda (_date name)
-                           (eq name metric-name)))
-           (table-action-fcn (lambda (date _name value)
-                                    (setq date-bin (tracker--date-to-bin date date-grouping)
-                                          found-value (gethash date-bin bin-data))
-                                    (if found-value
-                                        (puthash date-bin (+ found-value (tracker--val-to-bin value value-transform)) bin-data)
-                                      (puthash date-bin (tracker--val-to-bin value value-transform) bin-data)))))
+    ;; load metric data into bins
+    (setq sorted-bin-data (tracker--bin-metric-data metric-name date-grouping value-transform today))
 
-      (tracker--process-diary table-filter-fcn table-action-fcn)
+    ;; print
+    (if (eq date-grouping 'full)
+        (message "Overall %s %s: %s"
+                 metric-name
+                 (replace-regexp-in-string "-" " " (symbol-name value-transform))
+                 (cddr sorted-bin-data))
+      (let ((write-table-fcn (lambda ()
+                               (insert (format "| %s | %s %s |\n" ; header
+                                               date-grouping
+                                               metric-name
+                                               (replace-regexp-in-string "-" " " (symbol-name value-transform))))
+                               (insert "|--\n")
+                               (dolist (bin sorted-bin-data)
+                                 (insert (format "| %s | %s |\n"  ; data
+                                                 (format-time-string (tracker--format-bin date-grouping) (car bin))
+                                                 (cdr bin))))
+                               (goto-char (point-min))
+                               (orgtbl-mode t)
+                               (org-ctrl-c-ctrl-c))))
+        (tracker--write-tracker-output write-table-fcn)))))
 
-      ;; fill gaps
-      (unless (eq date-grouping 'full)
-        (let ((current-date-bin first-date-bin))
-          (while (time-less-p current-date-bin today-bin)
-            (setq current-date-bin (tracker--date-to-next-bin current-date-bin date-grouping)) ; increment to next bin
-            (unless (gethash current-date-bin bin-data)
-              (puthash current-date-bin 0 bin-data)))))
+(defun tracker-graph ()
+  "Get a graph of the requested metric."
+  (interactive)
 
-      ;; convert to alist and sort
-      (maphash (lambda (key value) (setq sorted-bin-data (cons (cons key value) sorted-bin-data))) bin-data)
-      (setq sorted-bin-data (sort sorted-bin-data (lambda (a b) (time-less-p (car a) (car b)))))
+  (tracker--check-gnuplot-exists)
 
-      ;; scale and print
-      (if (eq date-grouping 'full)
-          (message "Overall %s %s: %s"
-                   metric-name
-                   (replace-regexp-in-string "-" " " (symbol-name value-transform))
-                   (tracker--bin-to-val (cdar sorted-bin-data) value-transform date-grouping
-                                        (cddr sorted-bin-data)
-                                        first-date first-date-bin
-                                        today today-bin))
-        (let ((write-table-fcn (lambda ()
-                                 (insert (format "| %s | %s %s |\n" ; header
-                                                 date-grouping
-                                                 metric-name
-                                                 (replace-regexp-in-string "-" " " (symbol-name value-transform))))
-                                 (insert "|--\n")
-                                 (dolist (bin sorted-bin-data)
-                                   (insert (format "| %s | %s |\n"  ; data
-                                                   (tracker--format-bin (car bin) date-grouping)
-                                                   (tracker--bin-to-val (cdr bin) value-transform date-grouping
-                                                                        (car bin)
-                                                                        first-date first-date-bin
-                                                                        today today-bin)))))))
-          (tracker--write-tracker-output write-table-fcn))))))
+  ;; make sure `tracker-metric-index' has been populated
+  (tracker--load-index)
 
-(defun tracker--write-tracker-output (table-fcn)
-  "Write tracker output to the output buffer.
-This function handles the output buffer and calls TABLE-FCN to
-write the table."
-  (let ((buffer (get-buffer-create "*Tracker Output*")))
-    (set-buffer buffer)
-    (read-only-mode -1)
-    (erase-buffer)
+  (let ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
+        (today (tracker--string-to-date (format-time-string "%F")))
+        metric-name date-grouping value-transform
+        sorted-bin-data)
 
-    (funcall table-fcn)
+    ;; ask for params
+    (setq metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names)
+          date-grouping (intern (completing-read "Group dates by: " tracker-date-grouping-options nil t nil nil "month"))
+          value-transform (intern (completing-read "Value transform: " tracker-value-transform-options nil t nil nil "total")))
+    ;; (message "params: %s %s %s" date-grouping value-transform metric-name)
 
-    (goto-char (point-min))
-    (orgtbl-mode t)
-    (org-ctrl-c-ctrl-c)
+    ;; load metric data into bins
+    (setq sorted-bin-data (tracker--bin-metric-data metric-name date-grouping value-transform today))
 
-    ;; show output buffer
-    (read-only-mode 1)
-    (set-window-buffer (selected-window) buffer)))
+    (let* ((buffer (get-buffer-create "*Tracker Output*"))
+           (date-format (tracker--format-bin date-grouping))
+           (run-gnuplot-fcn (lambda ()
+                              (with-temp-buffer
+                                (insert (format "set term dumb %d %d\n\n"
+                                                (1- (window-width))
+                                                (1- (window-height))))
+                                (insert (format "set title \"%s %s\"\n"
+                                                metric-name
+                                                (replace-regexp-in-string "-" " " (symbol-name value-transform))))
+                                (insert "set xlabel \"date\"\n")
+                                (insert (format "set ylabel \"%s\"\n" value-transform))
+                                (insert (format "set timefmt \"%s\"\n" date-format))
+                                (insert (format "set format x \"%s\"\n" date-format))
+                                (insert "set xdata time\n")
+                                (insert "set xtics rotate\n")
+                                (insert "set style line 1 lw 1.2\n")
+                                (insert "plot \"-\" using 1:2 with lines notitle ls 1\n")
+                                (insert (mapconcat (lambda (x) (format "%s %s" (format-time-string date-format (car x)) (cdr x)))
+                                                   sorted-bin-data
+                                                   "\n"))
+                                (insert "\ne")
+                                (call-process-region (point-min) (point-max) "gnuplot" nil buffer)
+                                ;; delete the formfeed at the top of gnuplot output
+                                (set-buffer buffer)
+                                (goto-char (point-min))
+                                (while (re-search-forward "\f" nil t)
+                                  (replace-match ""))))))
+      (tracker--write-tracker-output run-gnuplot-fcn))))
 
 (provide 'tracker)
 

@@ -8,7 +8,13 @@
   [[https://github.com/ianxm/emacs-tracker][tracker.el]] adds to emacs the capability to generate tables and
   charts from the personal metrics data found in your diary entries.
 
-  this is a port of [[https://github.com/ianxm/tracker][tracker]] from haxe to elisp.
+  using tracker.el, you can track daily personal metrics using your
+  emacs diary.  each metric is a count of something per day.  the
+  point is to measure behaviors that you are trying to increase (like
+  exercise) or decrease (like watching buffy the vampire slayer) so
+  that you can see if you are making progress toward that goal.
+
+  this is a port of [[https://github.com/ianxm/tracker][tracker]].
 
 * usage
 
@@ -26,13 +32,17 @@
    tracker.el uses must look like:
 
 #+BEGIN_SRC
-   [date] [metric name] [value]
+   [date] [metric-name] [value]
 #+END_SRC
 
    where,
-     `[date]' must be formatted as yyyy-mm-dd
-     `[metric name]' is any string
-     `[value]' is a number (integer or decimal)
+   - date :: must be formatted as yyyy-mm-dd
+   - metric-name :: is any string
+   - value :: is a number (integer or decimal)
+
+   tracker.el doesn't care about units.  value is just a number.  if
+   you're tracking how much tv you watch, a "4" could mean four shows
+   or four hours, it's up to you.
 
    you can set the default date format to yyyy-mm-dd with this line in
    your init file:
@@ -52,10 +62,63 @@
     M-x tracker-list
 #+END_SRC
 
+    this creates a table containing all of the metrics found in your
+    emacs diary.  tracker write out a table containing the following
+    columns:
+    - metric :: the metric name
+    - count :: the number of entries for this metric
+    - first :: the date of the first entry
+    - last :: the date of the last entry
+    - days :: the number of days from "first" to "last"
+
+    here's an example:
+
+#+BEGIN_SRC org-mode
+| metric        | count |      first |       last | days |
+|---------------+-------+------------+------------+------|
+| emacs-tracker |     9 | 2019-11-23 | 2019-12-10 |   18 |
+| beer          |  1343 | 2012-02-13 | 2019-12-06 | 2854 |
+| commute       |  1774 | 2006-05-22 | 2019-10-25 | 4905 |
+#+END_SRC
+
 *** table
 
 #+BEGIN_SRC
-    M-x tracker-table [metric-name] [date-grouping] [aggregator]
+    M-x tracker-table [metric-name] [date-grouping] [value-transform]
+#+END_SRC
+
+    the input parameters are:
+    - metric-name :: the metric name
+    - date-grouping :: how many days to clump in each row. one of:
+      - day
+      - week
+      - month
+      - year
+      - full
+    - value-transform :: how to transform the data. one of:
+      - total :: sum all of the values in the bin
+      - count :: count entries in the bin
+      - per-day :: divide the bin total by the number of days in the bin
+      - per-week :: divide the bin total by the number of weeks in the bin
+      - per-month :: divide the bin total by the number of months in the bin
+      - per-year :: divide the bin total by the number of years in the bin
+
+    this creates a table containing the transformed data for the
+    requested metric.
+
+    here's an example:
+
+#+BEGIN_SRC org-mode
+| year | beer per week |
+|------+---------------|
+| 2012 |           7.5 |
+| 2013 |           6.1 |
+| 2014 |          11.5 |
+| 2015 |          11.4 |
+| 2016 |          11.2 |
+| 2017 |           6.5 |
+| 2018 |           5.1 |
+| 2019 |           3.6 |
 #+END_SRC
 
 *** graph
@@ -64,10 +127,57 @@
     on your system and you'll need the gnuplot emacs package.
 
 #+BEGIN_SRC
-    M-x tracker-graph [metric-name] [date-grouping] [aggregator]
+    M-x tracker-graph [metric-name] [date-grouping] [value-transform]
 #+END_SRC
 
-*** streaks
-*** bursts
+    input parameters are the same as in `tracker-table' above.
+
+    the graph of the metric used in the `tracker-table' example looks
+    like:
+
+#+BEGIN_SRC org-mode
+:                                beer per week
+:
+:  12 +-+-+-+-+-+--+-+-+-+-+-+-+-+-+-+--+-+-+-+-+-+-+-+-+-+-+--+-+-+-+-+-+
+:     +       +        +       +....... +       +       +        +       +
+:    |                       :        +........+                        |
+:  11 +-+                     :                  :                     +-+
+:    |                      :                   :                       |
+:  10 +-+                    :                    :                    +-+
+:    |                     :                      :                     |
+:    |                     :                      :                     |
+:   9 +-+                  :                        :                  +-+
+:    |                   :                          :                   |
+:   8 +-+                 :                          :                 +-+
+:    |       +...       :                            :                  |
+:    |           ..     :                             :                 |
+:   7 +-+           ..  :                              :               +-+
+:    |               . :                               +...             |
+:   6 +-+              +                                    ..         +-+
+:    |                                                       ..         |
+:    |                                                         .        |
+:   5 +-+                                                        +...  +-+
+:    |                                                              ... |
+:   4 +-+                                                              +-+
+:    |                                                                  |
+:     +       +        +       +        +       +       +        +       +
+:   3 +-+-+-+-+-+--+-+-+-+-+-+-+-+-+-+--+-+-+-+-+-+-+-+-+-+-+--+-+-+-+-+-+
+:   2011    2012     2013    2014     2015    2016    2017     2018    2019
+:                                    date
+#+END_SRC
+
 *** cal
+
+    todo
+
+*** streaks
+
+    todo
+
+*** bursts
+
+    todo
+
 *** records
+
+    todo
