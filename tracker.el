@@ -144,7 +144,6 @@ This reads the diary file."
 (defvar tracker-value-transform-options
   '(total count percent per-day per-week per-month per-year))
 
-
 (defun tracker--date-to-bin (date date-grouping)
   "Return the start date of the bin containing DATE of size DATE-GROUPING."
   (if (eq date-grouping 'full)
@@ -240,7 +239,7 @@ needed to determine the number of days in the current bin."
                        ((eq date-grouping 'full) (float (- (time-to-days today)
                                                            (time-to-days first-date)))))))
     (cond
-     ((eq value-transform 'total) value)
+     ((eq value-transform 'total) (format "%g" value))
      ((eq value-transform 'count) value)
      ((eq value-transform 'percent) (format "%.1f" (* (/ value bin-duration) 100)))
      ((eq value-transform 'per-day) (format "%.1f" (* value (/ 1 bin-duration))))
@@ -334,7 +333,7 @@ write the table."
         (message "Overall %s %s: %s"
                  metric-name
                  (replace-regexp-in-string "-" " " (symbol-name value-transform))
-                 (cddr sorted-bin-data))
+                 (cdar sorted-bin-data))
       (let ((write-table-fcn (lambda ()
                                (insert (format "| %s | %s %s |\n" ; header
                                                date-grouping

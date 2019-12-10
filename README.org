@@ -84,10 +84,10 @@
 *** table
 
 #+BEGIN_SRC
-    M-x tracker-table [metric-name] [date-grouping] [value-transform]
+    M-x tracker-table
 #+END_SRC
 
-    the input parameters are:
+    emacs will prompt for the following input parameters:
     - metric-name :: the metric name
     - date-grouping :: how many days to clump in each row. one of:
       - day
@@ -123,16 +123,19 @@
 
 *** graph
 
-    the graph commands depend on gnuplot, so gnuplot must be installed
-    on your system and you'll need the gnuplot emacs package.
+    the graph command depends on `gnuplot`, so gnuplot must be installed
+    on your system and available on your `PATH`.
 
 #+BEGIN_SRC
-    M-x tracker-graph [metric-name] [date-grouping] [value-transform]
+    M-x tracker-graph
 #+END_SRC
 
-    input parameters are the same as in `tracker-table' above.
+    emacs will prompt for the same input parameters as in
+    `tracker-table` above and also.
 
-    the graph of the metric used in the `tracker-table' example looks
+
+
+    the graph of the metric used in the `tracker-table` example looks
     like:
 
 #+BEGIN_SRC org-mode
