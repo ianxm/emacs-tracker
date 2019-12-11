@@ -50,11 +50,19 @@
                   (nth 1 fields)    ; month
                   (nth 0 fields)))) ; year
 
+(defcustom tracker-graph-size '(700 . 500)
+  "Specifies the size as (width . height) to be used for graph images."
+  :type '(cons integer integer)
+  :group 'tracker)
+
 (defvar tracker-metric-index nil
   "This is the list of metrics read from the diary file.
 It is a list containing: (name count first last) for each metric.
 It is cleared when the tracker output buffer is killed, forcing
 the diary file to be re-read if the data is needed again.")
+
+(defvar tracker-tempfiles nil
+  "This is the list of tempfiles (graph images) that have been created during the current session.")
 
 (defvar tracker-metric-names (make-vector 5 0)
   "This is an obarray of all existing metric names.")
@@ -75,12 +83,23 @@ apply the given FILTER and ACTION."
               (funcall action metric-date metric-name metric-value)))))))
 
 (defun tracker-clear-data ()
-  "Clear the data saved in `tracker-metric-index'.
-By clearing it now we force it to be re-read from the diary file
-the next time it is needed."
+  "Clear cached data and delete tempfiles.
+Clear the data cached in `tracker-metric-index' in order to force
+it to be re-read from the diary file the next time it is
+needed.  Also delete the tempfiles (graph images) listed in
+`tracker-tempfiles'."
   (when (string= (buffer-name (current-buffer)) "*Tracker Output*")
     (setq tracker-metric-index nil)
+    (tracker-remove-tempfiles)
     (remove-hook 'kill-buffer-hook #'tracker-clear-data)))
+
+(defun tracker-remove-tempfiles ()
+  "Remove any tempfiles (graph images) that were created during the current session."
+  (dolist (elt tracker-tempfiles)
+    (if (file-exists-p elt)
+        (delete-file elt)))
+  (setq tracker-tempfiles nil)
+  (remove-hook 'kill-emacs-hook #'tracker-remove-tempfiles))
 
 (defun tracker--load-index ()
   "Make sure the metric index has been populated.
@@ -122,27 +141,34 @@ This reads the diary file."
 
   (tracker--load-index)
 
-  (let ((write-table-fcn (lambda ()
-                           (insert "| metric | count | first | last | days |\n") ; header
-                           (insert "|--\n")
-                           (dolist (metric tracker-metric-index)
-                             (insert (format "| %s | %s | %s | %s | %s |\n"      ; data
-                                             (nth 0 metric)
-                                             (nth 1 metric)
-                                             (format-time-string "%F" (nth 2 metric))
-                                             (format-time-string "%F" (nth 3 metric))
-                                             (1+ (- (time-to-days (nth 3 metric))
-                                                    (time-to-days (nth 2 metric)))))))
-                           (goto-char (point-min))
-                           (orgtbl-mode t)
-                           (org-ctrl-c-ctrl-c))))
-    (tracker--write-tracker-output write-table-fcn)))
+  (tracker--setup-output-buffer)
+
+  (insert "| metric | count | first | last | days |\n") ; header
+  (insert "|--\n")
+  (dolist (metric tracker-metric-index)
+    (insert (format "| %s | %s | %s | %s | %s |\n"      ; data
+                    (nth 0 metric)
+                    (nth 1 metric)
+                    (format-time-string "%F" (nth 2 metric))
+                    (format-time-string "%F" (nth 3 metric))
+                    (1+ (- (time-to-days (nth 3 metric))
+                           (time-to-days (nth 2 metric)))))))
+  (goto-char (point-min))
+  (orgtbl-mode t)
+  (org-ctrl-c-ctrl-c)
+  (tracker--show-output-buffer))
 
 (defvar tracker-date-grouping-options
   '(day week month year full))
 
 (defvar tracker-value-transform-options
   '(total count percent per-day per-week per-month per-year))
+
+(defvar tracker-graph-options
+  '(line bar scatter))
+
+(defvar tracker-graph-output-options
+  '(ascii svg png))
 
 (defun tracker--date-to-bin (date date-grouping)
   "Return the start date of the bin containing DATE of size DATE-GROUPING."
@@ -287,20 +313,20 @@ bin data as (list (date . pretransformed-value))."
                                        (car bin) first-date today)))
     sorted-bin-data))
 
-(defun tracker--write-tracker-output (output-fcn)
-  "Write tracker output to the output buffer.
-This function handles the output buffer and calls OUTPUT-FCN to
-write the table."
+(defun tracker--setup-output-buffer ()
+  "Create and clear the output buffer."
   (let ((buffer (get-buffer-create "*Tracker Output*")))
+      (set-buffer buffer)
+      (read-only-mode -1)
+      (erase-buffer)))
+
+(defun tracker--show-output-buffer ()
+  "Show the output buffer."
+  (let ((buffer (get-buffer "*Tracker Output*")))
     (set-buffer buffer)
-    (read-only-mode -1)
-    (erase-buffer)
-
-    (funcall output-fcn)
-
-    ;; show output buffer
     (read-only-mode 1)
-    (set-window-buffer (selected-window) buffer)))
+    (set-window-buffer (selected-window) buffer))
+  )
 
 (defun tracker--check-gnuplot-exists ()
   "Check if gnuplot is installed on the system."
@@ -334,20 +360,77 @@ write the table."
                  metric-name
                  (replace-regexp-in-string "-" " " (symbol-name value-transform))
                  (cdar sorted-bin-data))
-      (let ((write-table-fcn (lambda ()
-                               (insert (format "| %s | %s %s |\n" ; header
-                                               date-grouping
-                                               metric-name
-                                               (replace-regexp-in-string "-" " " (symbol-name value-transform))))
-                               (insert "|--\n")
-                               (dolist (bin sorted-bin-data)
-                                 (insert (format "| %s | %s |\n"  ; data
-                                                 (format-time-string (tracker--format-bin date-grouping) (car bin))
-                                                 (cdr bin))))
-                               (goto-char (point-min))
-                               (orgtbl-mode t)
-                               (org-ctrl-c-ctrl-c))))
-        (tracker--write-tracker-output write-table-fcn)))))
+
+      (tracker--setup-output-buffer)
+
+      (set-buffer "*Tracker Output*")
+      (insert (format "| %s | %s %s |\n" ; header
+                      date-grouping
+                      metric-name
+                      (replace-regexp-in-string "-" " " (symbol-name value-transform))))
+      (insert "|--\n")
+      (dolist (bin sorted-bin-data)
+        (insert (format "| %s | %s |\n"  ; data
+                        (format-time-string (tracker--format-bin date-grouping) (car bin))
+                        (cdr bin))))
+      (goto-char (point-min))
+      (orgtbl-mode t)
+      (org-ctrl-c-ctrl-c)
+
+      (tracker--show-output-buffer))))
+
+
+(defun tracker--make-gnuplot-config (metric-name
+                                     date-grouping value-transform
+                                     sorted-bin-data
+                                     graph-type graph-output fname)
+  "Write a gnuplot config (including inline data) to the (empty) current buffer.
+The gnuplot config depends on many variables which must all be
+passed in: METRIC-NAME, DATE-GROUPING, VALUE-TRANSFORM,
+SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
+  (let ((date-format (tracker--format-bin date-grouping))
+        (term (cond ((eq graph-output 'svg) "svg")
+                    ((eq graph-output 'png) "pngcairo")
+                    (t "dumb")))
+        (width (if (eq graph-output 'ascii) (1- (window-width)) (car tracker-graph-size)))
+        (height (if (eq graph-output 'ascii) (1- (window-height)) (cdr tracker-graph-size))))
+    (cond ((eq graph-output 'ascii)
+           (insert (format "set term %s size %d, %d\n\n" term width height))
+           (insert (format "set title \"%s %s\"\n"
+                           metric-name
+                           (replace-regexp-in-string "-" " " (symbol-name value-transform)))))
+          (t
+           (insert (format "set term %s size %d, %d background rgb \"gray90\"\n\n" term width height))
+           (insert (format "set title \"%s\"\n" metric-name))
+           (insert (format "set output \"%s\"\n" fname))))
+    (insert (format "set xlabel \"%s\"\n" date-grouping))
+    (insert (format "set timefmt \"%s\"\n" date-format))
+    (insert (format "set format x \"%s\"\n" date-format))
+    (insert (format "set ylabel \"%s\"\n" value-transform))
+    (cond ((eq graph-type 'line)
+           (insert "set xdata time\n")
+           (insert "set xtics rotate\n")
+           (insert "set style line 1 lw 1.2 \n")
+           (insert "plot \"-\" using 1:2 with lines notitle ls 1 lc rgbcolor \"#399320\"\n"))
+          ((eq graph-type 'bar)
+           (insert "set xtics rotate\n")
+           (insert "set boxwidth 0.9 relative\n")
+           (insert "set yrange [0:]\n")
+           (insert "set style data histogram\n")
+           (insert "set style histogram cluster\n")
+           (insert "set style fill solid\n")
+           (insert "plot \"-\" using 2:xtic(1) notitle lc rgbcolor \"#399320\"\n"))
+          ((eq graph-type 'scatter)
+           (insert "set xdata time\n")
+           (insert "set xtics rotate\n")
+           (insert "set style line 1 pt 7 ps 0.5\n")
+           (insert "plot \"-\" using 1:2 with points notitle ls 1 lc rgbcolor \"#399320\"\n")))
+    (insert (mapconcat (lambda (x) (format "%s %s"
+                                           (format-time-string date-format (car x))
+                                           (cdr x)))
+                       sorted-bin-data
+                       "\n"))
+    (insert "\ne")))
 
 (defun tracker-graph ()
   "Get a graph of the requested metric."
@@ -360,47 +443,44 @@ write the table."
 
   (let ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
         (today (tracker--string-to-date (format-time-string "%F")))
-        metric-name date-grouping value-transform
+        metric-name date-grouping value-transform graph-type graph-output
         sorted-bin-data)
 
     ;; ask for params
     (setq metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names)
           date-grouping (intern (completing-read "Group dates by: " tracker-date-grouping-options nil t nil nil "month"))
-          value-transform (intern (completing-read "Value transform: " tracker-value-transform-options nil t nil nil "total")))
+          value-transform (intern (completing-read "Value transform: " tracker-value-transform-options nil t nil nil "total"))
+          graph-type (intern (completing-read "Graph type: " tracker-graph-options nil t nil nil "line"))
+          graph-output (intern (completing-read "Graph output: " tracker-graph-output-options nil t nil nil "ascii")))
     ;; (message "params: %s %s %s" date-grouping value-transform metric-name)
 
     ;; load metric data into bins
     (setq sorted-bin-data (tracker--bin-metric-data metric-name date-grouping value-transform today))
 
     (let* ((buffer (get-buffer-create "*Tracker Output*"))
-           (date-format (tracker--format-bin date-grouping))
-           (run-gnuplot-fcn (lambda ()
-                              (with-temp-buffer
-                                (insert (format "set term dumb %d %d\n\n"
-                                                (1- (window-width))
-                                                (1- (window-height))))
-                                (insert (format "set title \"%s %s\"\n"
-                                                metric-name
-                                                (replace-regexp-in-string "-" " " (symbol-name value-transform))))
-                                (insert "set xlabel \"date\"\n")
-                                (insert (format "set ylabel \"%s\"\n" value-transform))
-                                (insert (format "set timefmt \"%s\"\n" date-format))
-                                (insert (format "set format x \"%s\"\n" date-format))
-                                (insert "set xdata time\n")
-                                (insert "set xtics rotate\n")
-                                (insert "set style line 1 lw 1.2\n")
-                                (insert "plot \"-\" using 1:2 with lines notitle ls 1\n")
-                                (insert (mapconcat (lambda (x) (format "%s %s" (format-time-string date-format (car x)) (cdr x)))
-                                                   sorted-bin-data
-                                                   "\n"))
-                                (insert "\ne")
-                                (call-process-region (point-min) (point-max) "gnuplot" nil buffer)
-                                ;; delete the formfeed at the top of gnuplot output
-                                (set-buffer buffer)
-                                (goto-char (point-min))
-                                (while (re-search-forward "\f" nil t)
-                                  (replace-match ""))))))
-      (tracker--write-tracker-output run-gnuplot-fcn))))
+           (fname (and (not (eq graph-output 'ascii)) (make-temp-file "tracker"))))
+      (with-temp-buffer
+        (tracker--make-gnuplot-config metric-name
+                                      date-grouping value-transform
+                                      sorted-bin-data
+                                      graph-type graph-output fname)
+        (save-current-buffer
+          (tracker--setup-output-buffer))
+
+        (unless (null fname)
+          (setq tracker-tempfiles (cons fname tracker-tempfiles)) ; keep track of it so we can delete it
+          (add-hook 'kill-emacs-hook #'tracker-remove-tempfiles))
+        (call-process-region (point-min) (point-max) "gnuplot" nil buffer)
+        (set-buffer buffer)
+        (goto-char (point-min))
+        (if (eq graph-output 'ascii)
+            (while (re-search-forward "\f" nil t) ; delete the formfeed in gnuplot output
+              (replace-match ""))
+          (insert-image (create-image fname) "graph") ; insert the tempfile into the output buffer
+          (insert "\n")
+          (goto-char (point-min)))
+
+        (tracker--show-output-buffer)))))
 
 (provide 'tracker)
 
