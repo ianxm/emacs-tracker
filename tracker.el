@@ -165,12 +165,12 @@ This reads the diary file."
   (tracker--show-output-buffer))
 
 (defvar tracker-grouping-and-transform-options
-  "This is a plist of date-grouping options mapped to value-transform options."
   '(day (total count)
     week (total count percent per-day)
     month (total count percent per-day per-week)
     year (total count percent per-day per-week per-month)
-    full (total count percent per-day per-week per-month per-year)))
+    full (total count percent per-day per-week per-month per-year))
+  "This is a plist of date-grouping options mapped to value-transform options.")
 
 (defun tracker--date-grouping-options ()
   "Pull the list of date-grouping options out of `tracker-grouping-and-transform-options'."
@@ -180,13 +180,11 @@ This reads the diary file."
   "Look up the valid value-transforms for the given DATE-GROUPING."
   (plist-get tracker-grouping-and-transform-options date-grouping))
 
-(defvar tracker-graph-options
-  "The types of supported graphs."
-  '(line bar scatter))
+(defvar tracker-graph-options '(line bar scatter)
+  "The types of supported graphs.")
 
-(defvar tracker-graph-output-options
-  "The graph output options."
-  '(ascii svg png))
+(defvar tracker-graph-output-options '(ascii svg png)
+  "The graph output options.")
 
 (defun tracker--date-to-bin (date date-grouping)
   "Return the start date of the bin containing DATE of size DATE-GROUPING."
