@@ -356,19 +356,14 @@ bin data as (list (date . pretransformed-value))."
   ;; make sure `tracker-metric-index' has been populated
   (tracker--load-index)
 
-  (let ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
-        (today (tracker--string-to-date (format-time-string "%F")))
-        metric-name date-grouping value-transform
-        sorted-bin-data)
-
-    ;; ask for params
-    (setq metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names)
-          date-grouping (intern (completing-read "Group dates by: " (tracker--date-grouping-options) nil t nil nil "month"))
-          value-transform (intern (completing-read "Value transform: " (tracker--value-transform-options date-grouping) nil t nil nil "total")))
-    ;; (message "params: %s %s %s" date-grouping value-transform metric-name)
-
-    ;; load metric data into bins
-    (setq sorted-bin-data (tracker--bin-metric-data metric-name date-grouping value-transform today))
+  (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
+         (today (tracker--string-to-date (format-time-string "%F")))
+         ;; ask for params
+         (metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names))
+         (date-grouping (intern (completing-read "Group dates by: " (tracker--date-grouping-options) nil t nil nil "month")))
+         (value-transform (intern (completing-read "Value transform: " (tracker--value-transform-options date-grouping) nil t nil nil "total")))
+         ;; load metric data into bins
+         (sorted-bin-data (tracker--bin-metric-data metric-name date-grouping value-transform today)))
 
     ;; print
     (if (eq date-grouping 'full)
@@ -457,46 +452,42 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
   ;; make sure `tracker-metric-index' has been populated
   (tracker--load-index)
 
-  (let ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
-        (today (tracker--string-to-date (format-time-string "%F")))
-        metric-name date-grouping value-transform graph-type graph-output
-        sorted-bin-data)
+  (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
+         (today (tracker--string-to-date (format-time-string "%F")))
+         ;; ask for params
+         (metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names))
+         (date-grouping (intern (completing-read "Group dates by: " (tracker--date-grouping-options) nil t nil nil "month")))
+         (value-transform (intern (completing-read "Value transform: " (tracker--value-transform-options date-grouping) nil t nil nil "total")))
+         (graph-type (intern (completing-read "Graph type: " tracker-graph-options nil t nil nil "line")))
+         (graph-output (intern (completing-read "Graph output: " tracker-graph-output-options nil t nil nil "ascii")))
+         ;; load metric data into bins
+         (sorted-bin-data (tracker--bin-metric-data metric-name date-grouping value-transform today))
+         ;; prep output buffer
+         (buffer (get-buffer-create "*Tracker Output*"))
+         (fname (and (not (eq graph-output 'ascii)) (make-temp-file "tracker"))))
 
-    ;; ask for params
-    (setq metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names)
-          date-grouping (intern (completing-read "Group dates by: " (tracker--date-grouping-options) nil t nil nil "month"))
-          value-transform (intern (completing-read "Value transform: " (tracker--value-transform-options date-grouping) nil t nil nil "total"))
-          graph-type (intern (completing-read "Graph type: " tracker-graph-options nil t nil nil "line"))
-          graph-output (intern (completing-read "Graph output: " tracker-graph-output-options nil t nil nil "ascii")))
-    ;; (message "params: %s %s %s" date-grouping value-transform metric-name)
+    (with-temp-buffer
+      (tracker--make-gnuplot-config metric-name
+                                    date-grouping value-transform
+                                    sorted-bin-data
+                                    graph-type graph-output fname)
+      (save-current-buffer
+        (tracker--setup-output-buffer))
 
-    ;; load metric data into bins
-    (setq sorted-bin-data (tracker--bin-metric-data metric-name date-grouping value-transform today))
+      (unless (null fname)
+        (setq tracker-tempfiles (cons fname tracker-tempfiles)) ; keep track of it so we can delete it
+        (add-hook 'kill-emacs-hook #'tracker-remove-tempfiles))
+      (call-process-region (point-min) (point-max) "gnuplot" nil buffer)
+      (set-buffer buffer)
+      (goto-char (point-min))
+      (if (eq graph-output 'ascii)
+          (while (re-search-forward "\f" nil t) ; delete the formfeed in gnuplot output
+            (replace-match ""))
+        (insert-image (create-image fname) "graph") ; insert the tempfile into the output buffer
+        (insert "\n")
+        (goto-char (point-min)))
 
-    (let* ((buffer (get-buffer-create "*Tracker Output*"))
-           (fname (and (not (eq graph-output 'ascii)) (make-temp-file "tracker"))))
-      (with-temp-buffer
-        (tracker--make-gnuplot-config metric-name
-                                      date-grouping value-transform
-                                      sorted-bin-data
-                                      graph-type graph-output fname)
-        (save-current-buffer
-          (tracker--setup-output-buffer))
-
-        (unless (null fname)
-          (setq tracker-tempfiles (cons fname tracker-tempfiles)) ; keep track of it so we can delete it
-          (add-hook 'kill-emacs-hook #'tracker-remove-tempfiles))
-        (call-process-region (point-min) (point-max) "gnuplot" nil buffer)
-        (set-buffer buffer)
-        (goto-char (point-min))
-        (if (eq graph-output 'ascii)
-            (while (re-search-forward "\f" nil t) ; delete the formfeed in gnuplot output
-              (replace-match ""))
-          (insert-image (create-image fname) "graph") ; insert the tempfile into the output buffer
-          (insert "\n")
-          (goto-char (point-min)))
-
-        (tracker--show-output-buffer)))))
+      (tracker--show-output-buffer))))
 
 (provide 'tracker)
 
