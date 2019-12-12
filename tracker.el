@@ -140,6 +140,7 @@ it is nil."
                                        (lambda (a b) (time-less-p (nth 3 b) (nth 3 a)))))
       (add-hook 'kill-buffer-hook #'tracker-clear-data))))
 
+;;;###autoload
 (defun tracker-list ()
   "Display a list of all saved metrics in the output buffer.
 This reads the diary file."
@@ -349,6 +350,7 @@ bin data as (list (date . pretransformed-value))."
   (unless (eq 0 (call-process-shell-command "gnuplot --version"))
     (error "Cannot find gnuplot")))
 
+;;;###autoload
 (defun tracker-table ()
    "Get a tabular view of the requested metric."
   (interactive)
@@ -443,6 +445,7 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
                        "\n"))
     (insert "\ne")))
 
+;;;###autoload
 (defun tracker-graph ()
   "Get a graph of the requested metric."
   (interactive)
