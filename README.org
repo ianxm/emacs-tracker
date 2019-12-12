@@ -22,9 +22,10 @@
 
    metrics entries are regular diary entries so they can be created by
    updating the diary in the normal way, but diary entries that aren't
-   in a certain format will be ignored by tracker.  consider using
-   abbrev mode in diary mode and setting abbreviations for your
-   metrics to save yourself a few keystrokes.
+   in a certain format will be ignored by tracker.
+
+   tip: consider using abbrev mode in diary mode and setting
+   abbreviations for your metrics to save yourself a few keystrokes.
 
 *** diary entry format
 
@@ -150,16 +151,16 @@
 :  45 +-+-++++-++++-++++-++++-++++-++++-++++-++++-++++-++++-++++-++++-+++++-+
 :     +   +     +    +    +         +         +         +         +         +
 :  40 +-++            +             +...                                  +-+
-:    | +              +           .    .                                   |
+:     | +              +           .    .                                   |
 :  35 +-+               +        ..      +                                +-+
-:    |                  +      .         :                                 |
+:     |                  +      .         :                                 |
 :  30 +-+                 +....+          :                               +-+
-:    |                                    :           .+                   |
-:    |                                     :        ..  :                  |
+:     |                                    :           .+                   |
+:     |                                     :        ..  :                  |
 :  25 +-+                                    :    .+.     :               +-+
-:    |                                      :  ..         :                |
+:     |                                      :  ..         :                |
 :  20 +-+                                     +.           :              +-+
-:    |                                                     :               |
+:     |                                                     :               |
 :  15 +-+                                                    +....+....   +-+
 :     +         +         +         +         +         +         +    +    +
 :  10 +-+-++++-++++-++++-++++-++++-++++-++++-++++-++++-++++-++++-++++-+++++-+

@@ -25,8 +25,8 @@
 
 ;;; Commentary:
 
-;; tracker.el provides the capability to generate tables and charts
-;; from the personal metrics data found in your diary entries.
+;; tracker.el generates tables and charts from the personal metrics
+;; data found in your diary entries.
 
 ;;; Code:
 
@@ -158,16 +158,28 @@ This reads the diary file."
   (org-ctrl-c-ctrl-c)
   (tracker--show-output-buffer))
 
-(defvar tracker-date-grouping-options
-  '(day week month year full))
+(defvar tracker-grouping-and-transform-options
+  "This is a plist of date-grouping options mapped to value-transform options."
+  '(day (total count)
+    week (total count percent per-day)
+    month (total count percent per-day per-week)
+    year (total count percent per-day per-week per-month)
+    full (total count percent per-day per-week per-month per-year)))
 
-(defvar tracker-value-transform-options
-  '(total count percent per-day per-week per-month per-year))
+(defun tracker--date-grouping-options ()
+  "Pull the list of date-grouping options out of `tracker-grouping-and-transform-options'."
+  (seq-filter (lambda (x) (symbolp x)) tracker-grouping-and-transform-options))
+
+(defun tracker--value-transform-options (date-grouping)
+  "Look up the valid value-transforms for the given DATE-GROUPING."
+  (plist-get tracker-grouping-and-transform-options date-grouping))
 
 (defvar tracker-graph-options
+  "The types of supported graphs."
   '(line bar scatter))
 
 (defvar tracker-graph-output-options
+  "The graph output options."
   '(ascii svg png))
 
 (defun tracker--date-to-bin (date date-grouping)
@@ -334,7 +346,7 @@ bin data as (list (date . pretransformed-value))."
     (error "Cannot find gnuplot")))
 
 (defun tracker-table ()
-  "Get a tabular view of the requested metric."
+   "Get a tabular view of the requested metric."
   (interactive)
 
   ;; make sure `tracker-metric-index' has been populated
@@ -347,8 +359,8 @@ bin data as (list (date . pretransformed-value))."
 
     ;; ask for params
     (setq metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names)
-          date-grouping (intern (completing-read "Group dates by: " tracker-date-grouping-options nil t nil nil "month"))
-          value-transform (intern (completing-read "Value transform: " tracker-value-transform-options nil t nil nil "total")))
+          date-grouping (intern (completing-read "Group dates by: " (tracker--date-grouping-options) nil t nil nil "month"))
+          value-transform (intern (completing-read "Value transform: " (tracker--value-transform-options date-grouping) nil t nil nil "total")))
     ;; (message "params: %s %s %s" date-grouping value-transform metric-name)
 
     ;; load metric data into bins
@@ -448,8 +460,8 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
 
     ;; ask for params
     (setq metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names)
-          date-grouping (intern (completing-read "Group dates by: " tracker-date-grouping-options nil t nil nil "month"))
-          value-transform (intern (completing-read "Value transform: " tracker-value-transform-options nil t nil nil "total"))
+          date-grouping (intern (completing-read "Group dates by: " (tracker--date-grouping-options) nil t nil nil "month"))
+          value-transform (intern (completing-read "Value transform: " (tracker--value-transform-options date-grouping) nil t nil nil "total"))
           graph-type (intern (completing-read "Graph type: " tracker-graph-options nil t nil nil "line"))
           graph-output (intern (completing-read "Graph output: " tracker-graph-output-options nil t nil nil "ascii")))
     ;; (message "params: %s %s %s" date-grouping value-transform metric-name)
