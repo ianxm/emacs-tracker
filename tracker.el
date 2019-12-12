@@ -33,6 +33,28 @@
 (require 'seq)
 (require 'timezone)
 
+(defcustom tracker-graph-size '(700 . 500)
+  "Specifies the size as (width . height) to be used for graph images."
+  :type '(cons integer integer)
+  :group 'tracker)
+
+(defcustom tracker-metric-name-blacklist nil
+  "A list of metric names to exclude from reports."
+  :type '(list :inline t string)
+  :group 'tracker)
+
+(defvar tracker-metric-index nil
+  "This is the list of metrics read from the diary file.
+It is a list containing: (name count first last) for each metric.
+It is cleared when the tracker output buffer is killed, forcing
+the diary file to be re-read if the data is needed again.")
+
+(defvar tracker-tempfiles nil
+  "This is the list of tempfiles (graph images) that have been created during the current session.")
+
+(defvar tracker-metric-names (make-vector 5 0)
+  "This is an obarray of all existing metric names.")
+
 (defmacro tracker--min-date (d1 d2)
   "Return the earlier of the given dates D1 and D2."
   `(if (time-less-p ,d1 ,d2) ,d1 ,d2))
@@ -49,23 +71,6 @@
                   (nth 2 fields)    ; day
                   (nth 1 fields)    ; month
                   (nth 0 fields)))) ; year
-
-(defcustom tracker-graph-size '(700 . 500)
-  "Specifies the size as (width . height) to be used for graph images."
-  :type '(cons integer integer)
-  :group 'tracker)
-
-(defvar tracker-metric-index nil
-  "This is the list of metrics read from the diary file.
-It is a list containing: (name count first last) for each metric.
-It is cleared when the tracker output buffer is killed, forcing
-the diary file to be re-read if the data is needed again.")
-
-(defvar tracker-tempfiles nil
-  "This is the list of tempfiles (graph images) that have been created during the current session.")
-
-(defvar tracker-metric-names (make-vector 5 0)
-  "This is an obarray of all existing metric names.")
 
 (defun tracker--process-diary (filter action)
   "Read the diary file.
@@ -106,21 +111,22 @@ needed.  Also delete the tempfiles (graph images) listed in
 This reads the diary file and fills in `tracker-metric-list' if
 it is nil."
   (when (not tracker-metric-index)
-    (let* (metrics
+    (let* (metrics ; will contain plist of metric-name -> (metric-name count first last)
            existing-metric
-           (list-action (lambda (date name _value)
-                          (setq existing-metric (plist-get metrics name))
-                          (if (not existing-metric)
-                              (setq metrics (plist-put metrics
-                                                       name
-                                                       (list name 1 date date)))
-                            (setcar (nthcdr 1 existing-metric) (1+ (nth 1 existing-metric)))
-                            (setcar (nthcdr 2 existing-metric) (tracker--min-date (nth 2 existing-metric) date))
-                            (setcar (nthcdr 3 existing-metric) (tracker--max-date (nth 3 existing-metric) date))))))
+           (list-filter-fcn (lambda (_date name) ; filter out blacklisted metrics
+                              (not (seq-contains tracker-metric-name-blacklist (symbol-name name)))))
+           (list-action-fcn (lambda (date name _value)
+                              (setq existing-metric (plist-get metrics name))
+                              (if (not existing-metric)
+                                  (setq metrics (plist-put metrics
+                                                           name
+                                                           (list name 1 date date)))
+                                (setcar (nthcdr 1 existing-metric) (1+ (nth 1 existing-metric)))
+                                (setcar (nthcdr 2 existing-metric) (tracker--min-date (nth 2 existing-metric) date))
+                                (setcar (nthcdr 3 existing-metric) (tracker--max-date (nth 3 existing-metric) date))))))
 
       ;; read the diary file, fill `metrics' plist with "name -> (name count first last)"
-      (tracker--process-diary (lambda (_date _name) t) ; don't filter out any valid entries
-                              list-action)
+      (tracker--process-diary list-filter-fcn list-action-fcn)
 
       ;; get the property values from the `metrics' plist
       (let ((metric-iter metrics))

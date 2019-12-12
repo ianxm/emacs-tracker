@@ -82,6 +82,12 @@
 | commute       |  1774 | 2006-05-22 | 2019-10-25 | 4905 |
 #+END_SRC
 
+    tracker.el will pick up any diary entries that match the format it
+    is looking for, but that might pick up entries you don't want in
+    your report. you can exclude specific metric names by adding them
+    to the `tracker-metric-names-blacklist`. this custom variable
+    takes a list of metric names.
+
 *** table
 
 #+BEGIN_SRC
@@ -107,19 +113,20 @@
     this creates a table containing the transformed data for the
     requested metric.
 
-    here's an example:
+    here's an example, showing the percentage of days of each year
+    drinking a beer:
 
 #+BEGIN_SRC org-mode
-| year | beer per week |
-|------+---------------|
-| 2012 |           7.5 |
-| 2013 |           6.1 |
-| 2014 |          11.5 |
-| 2015 |          11.4 |
-| 2016 |          11.2 |
-| 2017 |           6.5 |
-| 2018 |           5.1 |
-| 2019 |           3.6 |
+| year | beer percent |
+|------+--------------|
+| 2012 |         54.0 |
+| 2013 |         48.2 |
+| 2014 |         58.6 |
+| 2015 |         59.5 |
+| 2016 |         50.7 |
+| 2017 |         39.5 |
+| 2018 |         35.3 |
+| 2019 |         30.3 |
 #+END_SRC
 
 *** graph
@@ -174,7 +181,8 @@
 
     [[./doc/commute_by_week.png]]
 
-    the dimensions of the image can be set by modifying `tracker-graph-size`.
+    the dimensions of the image can be set by modifying the variable
+    `tracker-graph-size`.
 
 *** cal
 
