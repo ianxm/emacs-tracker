@@ -2,14 +2,14 @@
 
   [[http://www.gnu.org/software/emacs/][emacs]] is a text editor.  an extensible one.  it is mainly used for
   coding, but it can also do anything else.  emacs includes a diary
-  which can be used to keep track of which things were done on which
+  which you can use to keep track of which things you do on which
   days.
 
-  [[https://github.com/ianxm/emacs-tracker][tracker.el]] adds to emacs the capability to generate tables and
-  charts from the personal metrics data found in your diary entries.
+  [[https://github.com/ianxm/emacs-tracker][tracker.el]] gives emacs the capability to generate tables and charts
+  from the personal metrics data found in your diary entries.
 
-  using tracker.el, you can track daily personal metrics using your
-  emacs diary.  each metric is a count of something per day.  the
+  using tracker.el, you can use your emacs diary to track daily
+  personal metrics.  each metric is a count of something per day.  the
   point is to measure behaviors that you are trying to increase (like
   exercise) or decrease (like watching buffy the vampire slayer) so
   that you can see if you are making progress toward that goal.
@@ -37,16 +37,16 @@
 #+END_SRC
 
    where,
-   - date :: must be formatted as yyyy-mm-dd
+   - date :: must be formatted as YYYY-MM-DD
    - metric-name :: is any string
    - value :: is a number (integer or decimal)
 
-   tracker.el doesn't care about units.  value is just a number.  if
-   you're tracking how much tv you watch, a "4" could mean four shows
-   or four hours, it's up to you.
+   tracker.el doesn't care about units.  ~value~ is just a number.  if
+   you're tracking how much tv you watch, a "4" could mean 4 shows or
+   4 hours, it's up to you.
 
-   you can set the default date format to yyyy-mm-dd with this line in
-   your init file:
+   you can set the default date format that the emacs diary uses to
+   ~YYYY-MM-DD~ with this line in your init file:
 
 #+BEGIN_SRC
    (calendar-set-date-style 'iso)
@@ -54,8 +54,8 @@
 
 ** reporting
 
-   tracker.el provides several ways to view the metrics data in your
-   diary.
+   tracker.el provides the following ways to view the metrics data in
+   your diary.
 
 *** list
 
@@ -84,8 +84,8 @@
 
     tracker.el will pick up any diary entries that match the format it
     is looking for, but that might pick up entries you don't want in
-    your report. you can exclude specific metric names by adding them
-    to the `tracker-metric-names-blacklist`. this custom variable
+    your report.  you can exclude specific metric names by adding them
+    to the ~tracker-metric-names-blacklist~.  this custom variable
     takes a list of metric names.
 
 *** table
@@ -131,15 +131,17 @@
 
 *** graph
 
-    the graph command depends on `gnuplot`, so gnuplot must be installed
-    on your system and available on your `PATH`.
+    tracker.el can take the same table data and use it to generate a
+    graph.  it uses gnuplot for graph generation, so gnuplot must be
+    installed on your system and available on your PATH.  I tested
+    with gnuplot 5.0.
 
 #+BEGIN_SRC
     M-x tracker-graph
 #+END_SRC
 
     emacs will prompt for the same input parameters as in
-    `tracker-table` above, as well as:
+    ~tracker-table~ above, as well as:
     - graph-type :: the type of graph to render. one of:
       - line
       - bar
@@ -184,18 +186,14 @@
     the dimensions of the image can be set by modifying the variable
     `tracker-graph-size`.
 
-*** cal
-
-    todo
-
-*** streaks
-
-    todo
-
-*** bursts
-
-    todo
-
-*** records
-
-    todo
+* todo
+  - allow other diary formats
+    - if no value, assume 1?
+    - allow other date formats
+  - metrics whitelist
+  - reports
+    - cal
+    - streaks
+    - bursts
+    - records
+  - report with multiple metrics (accept formulas)
