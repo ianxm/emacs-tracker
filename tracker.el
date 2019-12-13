@@ -38,8 +38,21 @@
   :type '(cons integer integer)
   :group 'tracker)
 
+(defcustom tracker-metric-name-whitelist nil
+  "A list of metric names to include in reports.  If this is
+specified, only the metrics in this list are considered.  All
+others are filtered out.  If this is set, then
+`tracker-metric-name-blacklist' has no effect.
+
+For example: '(\"pushups\" \"situps\")"
+  :type '(list :inline t string)
+  :group 'tracker)
+
 (defcustom tracker-metric-name-blacklist nil
-  "A list of metric names to exclude from reports."
+  "A list of metric names to exclude from reports.  This is
+ignored if `tracker-metric-name-whitelist' is set.
+
+For example: '(\"pushups\" \"situps\")"
   :type '(list :inline t string)
   :group 'tracker)
 
@@ -113,8 +126,14 @@ it is nil."
   (when (not tracker-metric-index)
     (let* (metrics ; will contain plist of metric-name -> (metric-name count first last)
            existing-metric
-           (list-filter-fcn (lambda (_date name) ; filter out blacklisted metrics
-                              (not (seq-contains tracker-metric-name-blacklist (symbol-name name)))))
+           (list-filter-fcn (cond ((not (null tracker-metric-name-whitelist))
+                                   (lambda (_date name) ; filter out non-whitelisted metrics
+                                     (seq-contains tracker-metric-name-whitelist (symbol-name name))))
+                                  ((not (null tracker-metric-name-blacklist))
+                                   (lambda (_date name) ; filter out blacklisted metrics
+                                     (not (seq-contains tracker-metric-name-blacklist (symbol-name name)))))
+                                  (t                    ; keep all metrics
+                                   (lambda (_date _name) t))))
            (list-action-fcn (lambda (date name _value)
                               (setq existing-metric (plist-get metrics name))
                               (if (not existing-metric)

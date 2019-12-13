@@ -27,6 +27,22 @@
    tip: consider using abbrev mode in diary mode and setting
    abbreviations for your metrics to save yourself a few keystrokes.
 
+*** whitelist / blacklist
+
+    by default tracker.el will pick up any diary entries that match
+    the format it is looking for, but that might pick up entries you
+    don't want in your report.  if there are a few metrics that get
+    picked up that you don't want to see, you can exclude them by
+    adding them to the ~tracker-metric-names-blacklist~.  this custom
+    variable takes a list of metric names as a list of strings, such
+    as ~'("pushups" "situps")~.
+
+    if tracker.el picks up lots of metrics that you don't want to see,
+    you could instead whitelist the ones you want by adding them to
+    the ~tracker-metric-names-whitelist~ custom variable.  this uses
+    the same format as ~tracker-metric-names-blacklist~.  if you
+    specify a whitelist, the blacklist is ignored.
+
 *** diary entry format
 
    emacs is very loose on diary entry formatting, but entries that
@@ -81,12 +97,6 @@
 | beer          |  1343 | 2012-02-13 | 2019-12-06 | 2854 |
 | commute       |  1774 | 2006-05-22 | 2019-10-25 | 4905 |
 #+END_SRC
-
-    tracker.el will pick up any diary entries that match the format it
-    is looking for, but that might pick up entries you don't want in
-    your report.  you can exclude specific metric names by adding them
-    to the ~tracker-metric-names-blacklist~.  this custom variable
-    takes a list of metric names.
 
 *** table
 
@@ -190,7 +200,6 @@
   - allow other diary formats
     - if no value, assume 1?
     - allow other date formats
-  - metrics whitelist
   - reports
     - cal
     - streaks
