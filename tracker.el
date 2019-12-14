@@ -39,9 +39,9 @@
   :group 'tracker)
 
 (defcustom tracker-metric-name-whitelist nil
-  "A list of metric names to include in reports.  If this is
-specified, only the metrics in this list are considered.  All
-others are filtered out.  If this is set, then
+  "A list of metric names to include in reports.
+If this is specified, only the metrics in this list are
+considered.  All others are filtered out.  If this is set, then
 `tracker-metric-name-blacklist' has no effect.
 
 For example: '(\"pushups\" \"situps\")"
@@ -49,8 +49,8 @@ For example: '(\"pushups\" \"situps\")"
   :group 'tracker)
 
 (defcustom tracker-metric-name-blacklist nil
-  "A list of metric names to exclude from reports.  This is
-ignored if `tracker-metric-name-whitelist' is set.
+  "A list of metric names to exclude from reports.
+This is ignored if `tracker-metric-name-whitelist' is set.
 
 For example: '(\"pushups\" \"situps\")"
   :type '(list :inline t string)
@@ -76,29 +76,27 @@ the diary file to be re-read if the data is needed again.")
   "Return the later of the given dates D1 and D2."
   `(if (time-less-p ,d1 ,d2) ,d2 ,d1))
 
-(defmacro tracker--string-to-date (date-string)
-  "Get a date value for DATE-STRING."
-  `(let ((fields (mapcar #'string-to-number
-                      (split-string ,date-string "-"))))
-     (encode-time 0 0 0
-                  (nth 2 fields)    ; day
-                  (nth 1 fields)    ; month
-                  (nth 0 fields)))) ; year
-
 (defun tracker--process-diary (filter action)
   "Read the diary file.
 For each valid metrics entry found, parse the fields and then
 apply the given FILTER and ACTION."
-  (let (metric-name metric-date metric-value)
+  (let ((valid-formats '("^\\([[:digit:]\-]+\\) \\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$"                           ; YYYY-MM-DD
+                         "^\\([[:alpha:]]+ [[:digit:]]+, [[:digit:]]+\\) \\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$"  ; MMM DD, YYYY
+                         "^\\([[:digit:]]+ [[:alpha:]]+ [[:digit:]]+\\) \\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$")) ; DD MMM YYYY
+        metric-name metric-date metric-value foundp)
     (with-temp-buffer
       (insert-file-contents diary-file)
       (dolist (line (split-string (buffer-string) "\n" t))
-        (when (string-match "\\([[:digit:]\-]+\\) \\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)" line) ; valid diary entry
-          (setq metric-name (intern (match-string 2 line) tracker-metric-names)
-                metric-value (string-to-number (match-string 3 line))
-                metric-date (tracker--string-to-date (match-string 1 line))) ; do this last because it (oddly) messes up match data
-          (if (funcall filter metric-date metric-name)
-              (funcall action metric-date metric-name metric-value)))))))
+        (setq foundp nil)
+        (dolist (format valid-formats)
+          (if (string-match format line)
+              (setq metric-date (apply 'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                                                            (seq-take (parse-time-string (match-string 1 line)) 6)))
+                    metric-name (intern (match-string 2 line) tracker-metric-names)
+                    metric-value (string-to-number (match-string 3 line))
+                    foundp t)))
+        (if (and foundp (funcall filter metric-date metric-name))
+            (funcall action metric-date metric-name metric-value))))))
 
 (defun tracker-clear-data ()
   "Clear cached data and delete tempfiles.
@@ -378,7 +376,8 @@ bin data as (list (date . pretransformed-value))."
   (tracker--load-index)
 
   (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
-         (today (tracker--string-to-date (format-time-string "%F")))
+         (today (apply 'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                                                        (seq-take (parse-time-string (format-time-string "%F")) 6))))
          ;; ask for params
          (metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names))
          (date-grouping (intern (completing-read "Group dates by: " (tracker--date-grouping-options) nil t nil nil "month")))
@@ -475,7 +474,8 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
   (tracker--load-index)
 
   (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
-         (today (tracker--string-to-date (format-time-string "%F")))
+         (today (apply 'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                                                        (seq-take (parse-time-string (format-time-string "%F")) 6))))
          ;; ask for params
          (metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names))
          (date-grouping (intern (completing-read "Group dates by: " (tracker--date-grouping-options) nil t nil nil "month")))
