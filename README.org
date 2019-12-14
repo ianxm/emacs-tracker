@@ -37,31 +37,28 @@
 #+END_SRC
 
    where,
-   - date :: the date of a particular day
-   - metric-name :: is any string
-   - value :: is a number (integer or decimal)
-
-   although the emacs diary allows dates like "wednesday" which
-   applies to all wednesdays, tracker only uses dates for specific
-   days.  examples of valid dates are:
-   - ~2020-01-01~
-   - ~1 Jan 2020~
-   - ~Jan 1, 2020~
-
-   the ~metric-name~ can be as long as you like and can include spaces
-   but keeping them short helps with readability.
-
-   tracker.el doesn't care about units.  ~value~ is just a number.  if
-   you're tracking how much tv you watch, a "4" could mean 4 shows or
-   4 hours, it's up to you.
+   - date :: the date of a particular day.  although the emacs diary
+             allows dates like "wednesday," which applies to all
+             wednesdays, tracker.el only uses dates for specific days.
+             examples of valid dates are:
+             - ~2020-01-01~
+             - ~1 Jan 2020~
+             - ~Jan 1, 2020~
+   - metric-name :: is any string.  it can be as long as you like and
+                    can include spaces but keeping them short helps
+                    with readability.
+   - value :: is a number (integer or decimal).  tracker.el doesn't
+              care about units.  ~value~ is just a number.  if you're
+              tracking how much tv you watch, a "4" could mean 4 shows
+              or 4 hours; it's up to you.
 
 *** whitelist / blacklist
 
     by default tracker.el will pick up any diary entries that match
-    the format it is looking for, but that might pick up entries you
-    don't want in your report.  if there are a few metrics that get
-    picked up that you don't want to see, you can exclude them by
-    adding them to the ~tracker-metric-names-blacklist~.  this custom
+    the format it is looking for, which means it might pick up entries
+    you don't want in your report.  if there are a few metrics that
+    get picked up that you don't want to see, you can exclude them by
+    adding them to ~tracker-metric-names-blacklist~.  this custom
     variable takes a list of metric names as a list of strings, such
     as:
 
@@ -73,7 +70,8 @@
     you could instead whitelist the ones you want by adding them to
     the ~tracker-metric-names-whitelist~ custom variable.  this uses
     the same format as ~tracker-metric-names-blacklist~.  if you
-    specify a whitelist, the blacklist is ignored.
+    specify a whitelist, only those are considered and the blacklist
+    is ignored.
 
 ** reporting
 
@@ -206,7 +204,6 @@
 * todo
   - allow other diary formats
     - if no value, assume 1?
-    - allow other date formats
   - reports
     - cal
     - streaks
