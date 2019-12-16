@@ -3,7 +3,7 @@
 ;; Copyright (C) 2019 Ian Martins
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
-;; URL: http://github.com/ianxm/emacs-tracker
+;; URL: https://github.com/ianxm/emacs-tracker
 ;; Version: 0.0.1
 ;; Keywords: docs
 ;; Package-Requires: ((emacs "24.4") (seq "2.20"))
@@ -21,7 +21,7 @@
 ;; GNU General Public License for more details.
 
 ;; For a full copy of the GNU General Public License
-;; see <http://www.gnu.org/licenses/>.
+;; see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -120,7 +120,10 @@ needed.  Also delete the tempfiles (graph images) listed in
 (defun tracker--load-index ()
   "Make sure the metric index has been populated.
 This reads the diary file and fills in `tracker-metric-list' if
-it is nil."
+it is nil.
+
+`tracker-metric-list' is a list of (metric-name count first last)
+sorted by 'last'."
   (when (not tracker-metric-index)
     (let* (metrics ; will contain plist of metric-name -> (metric-name count first last)
            existing-metric
@@ -510,6 +513,34 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
         (goto-char (point-min)))
 
       (tracker--show-output-buffer))))
+
+;;;###autoload
+(defun tracker-days-since ()
+   "Tell how long ago since the last occurrence of a metric."
+  (interactive)
+
+  ;; make sure `tracker-metric-index' has been populated
+  (tracker--load-index)
+
+  (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
+         ;; ask for params
+         (metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names))
+
+         ;; find the requested metric in the index
+         (today (apply 'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                                            (seq-take (parse-time-string (format-time-string "%F")) 6))))
+         ;; pull last-day from the index
+         (last-day (nth 3 (seq-find (lambda (x) (eq metric-name (nth 0 x)))
+                                    tracker-metric-index)))
+         ;; find how many days ago
+         (days-since (- (time-to-days today) (time-to-days last-day)))
+
+         (time-since (cond ((= days-since 0) "today")
+                           ((= days-since 1) "yesterday")
+                           (t (format "%d days ago" days-since)))))
+
+    ;; give the result in the minibuffer
+    (message "The last %s was %s." metric-name time-since)))
 
 (provide 'tracker)
 

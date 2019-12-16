@@ -201,6 +201,18 @@
     the dimensions of the image can be set by modifying the variable
     `tracker-graph-size`.
 
+*** days since
+
+#+BEGIN_SRC
+    M-x tracker-days-since
+#+END_SRC
+
+    emacs will prompt for the following input parameters:
+    - metric-name :: the metric name
+
+    this reports how long ago the last occurence was of the specified
+    metric.  the result is written to the minibuffer.
+
 * todo
   - allow other diary formats
     - if no value, assume 1?
