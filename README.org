@@ -91,16 +91,16 @@
     - count :: the number of entries for this metric
     - first :: the date of the first entry
     - last :: the date of the last entry
-    - days :: the number of days from "first" to "last"
+    - days ago :: the number of days since "last"
 
     here's an example:
 
 #+BEGIN_SRC org-mode
-| metric        | count |      first |       last | days |
-|---------------+-------+------------+------------+------|
-| emacs-tracker |     9 | 2019-11-23 | 2019-12-10 |   18 |
-| beer          |  1343 | 2012-02-13 | 2019-12-06 | 2854 |
-| commute       |  1774 | 2006-05-22 | 2019-10-25 | 4905 |
+| metric         | count |      first |       last | days ago |
+|----------------+-------+------------+------------+----------|
+| emacs-tracker  |    14 | 2019-11-23 | 2019-12-18 |        0 |
+| beer           |  1345 | 2012-02-13 | 2019-12-14 |        4 |
+| commute        |  1774 | 2006-05-22 | 2019-10-25 |       54 |
 #+END_SRC
 
 *** table
@@ -200,18 +200,6 @@
 
     the dimensions of the image can be set by modifying the variable
     `tracker-graph-size`.
-
-*** days since
-
-#+BEGIN_SRC
-    M-x tracker-days-since
-#+END_SRC
-
-    emacs will prompt for the following input parameters:
-    - metric-name :: the metric name
-
-    this reports how long ago the last occurence was of the specified
-    metric.  the result is written to the minibuffer.
 
 * todo
   - allow other diary formats

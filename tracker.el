@@ -125,8 +125,10 @@ it is nil.
 `tracker-metric-list' is a list of (metric-name count first last)
 sorted by 'last'."
   (when (not tracker-metric-index)
-    (let* (metrics ; will contain plist of metric-name -> (metric-name count first last)
+    (let* (metrics ; will contain plist of metric-name -> (metric-name count first last since)
            existing-metric
+           (today (apply 'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                                              (seq-take (parse-time-string (format-time-string "%F")) 6))))
            (list-filter-fcn (cond ((not (null tracker-metric-name-whitelist))
                                    (lambda (_date name) ; filter out non-whitelisted metrics
                                      (seq-contains tracker-metric-name-whitelist (symbol-name name))))
@@ -138,12 +140,14 @@ sorted by 'last'."
            (list-action-fcn (lambda (date name _value)
                               (setq existing-metric (plist-get metrics name))
                               (if (not existing-metric)
-                                  (setq metrics (plist-put metrics
-                                                           name
-                                                           (list name 1 date date)))
+                                  (setq metrics (plist-put metrics name
+                                                           (list name 1 date date (- (time-to-days today)
+                                                                                     (time-to-days date)))))
                                 (setcar (nthcdr 1 existing-metric) (1+ (nth 1 existing-metric)))
                                 (setcar (nthcdr 2 existing-metric) (tracker--min-date (nth 2 existing-metric) date))
-                                (setcar (nthcdr 3 existing-metric) (tracker--max-date (nth 3 existing-metric) date))))))
+                                (setcar (nthcdr 3 existing-metric) (tracker--max-date (nth 3 existing-metric) date))
+                                (setcar (nthcdr 4 existing-metric) (- (time-to-days today)
+                                                                      (time-to-days (nth 3 existing-metric))))))))
 
       ;; read the diary file, fill `metrics' plist with "name -> (name count first last)"
       (tracker--process-diary list-filter-fcn list-action-fcn)
@@ -156,8 +160,7 @@ sorted by 'last'."
                 metric-iter (cdr metric-iter))))
 
       ;; sort by last update date
-      (setq tracker-metric-index (sort tracker-metric-index
-                                       (lambda (a b) (time-less-p (nth 3 b) (nth 3 a)))))
+      (setq tracker-metric-index (sort tracker-metric-index (lambda (a b) (> (nth 4 b) (nth 4 a)))))
       (add-hook 'kill-buffer-hook #'tracker-clear-data))))
 
 ;;;###autoload
@@ -170,7 +173,7 @@ This reads the diary file."
 
   (tracker--setup-output-buffer)
 
-  (insert "| metric | count | first | last | days |\n") ; header
+  (insert "| metric | count | first | last | days ago |\n") ; header
   (insert "|--\n")
   (dolist (metric tracker-metric-index)
     (insert (format "| %s | %s | %s | %s | %s |\n"      ; data
@@ -178,8 +181,7 @@ This reads the diary file."
                     (nth 1 metric)
                     (format-time-string "%F" (nth 2 metric))
                     (format-time-string "%F" (nth 3 metric))
-                    (1+ (- (time-to-days (nth 3 metric))
-                           (time-to-days (nth 2 metric)))))))
+                    (nth 4 metric))))
   (goto-char (point-min))
   (orgtbl-mode t)
   (org-ctrl-c-ctrl-c)
@@ -455,7 +457,7 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
            (insert "set style fill solid\n")
            (insert "plot \"-\" using 2:xtic(1) notitle lc rgbcolor \"#399320\"\n"))
           ((eq graph-type 'scatter)
-           (insert "set xdata time\n")
+           (Insert "set xdata time\n")
            (insert "set xtics rotate\n")
            (insert "set style line 1 pt 7 ps 0.5\n")
            (insert "plot \"-\" using 1:2 with points notitle ls 1 lc rgbcolor \"#399320\"\n")))
@@ -513,34 +515,6 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
         (goto-char (point-min)))
 
       (tracker--show-output-buffer))))
-
-;;;###autoload
-(defun tracker-days-since ()
-   "Tell how long ago since the last occurrence of a metric."
-  (interactive)
-
-  ;; make sure `tracker-metric-index' has been populated
-  (tracker--load-index)
-
-  (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
-         ;; ask for params
-         (metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names))
-
-         ;; find the requested metric in the index
-         (today (apply 'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
-                                            (seq-take (parse-time-string (format-time-string "%F")) 6))))
-         ;; pull last-day from the index
-         (last-day (nth 3 (seq-find (lambda (x) (eq metric-name (nth 0 x)))
-                                    tracker-metric-index)))
-         ;; find how many days ago
-         (days-since (- (time-to-days today) (time-to-days last-day)))
-
-         (time-since (cond ((= days-since 0) "today")
-                           ((= days-since 1) "yesterday")
-                           (t (format "%d days ago" days-since)))))
-
-    ;; give the result in the minibuffer
-    (message "The last %s was %s." metric-name time-since)))
 
 (provide 'tracker)
 
