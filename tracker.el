@@ -457,7 +457,7 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
            (insert "set style fill solid\n")
            (insert "plot \"-\" using 2:xtic(1) notitle lc rgbcolor \"#399320\"\n"))
           ((eq graph-type 'scatter)
-           (Insert "set xdata time\n")
+           (insert "set xdata time\n")
            (insert "set xtics rotate\n")
            (insert "set style line 1 pt 7 ps 0.5\n")
            (insert "plot \"-\" using 1:2 with points notitle ls 1 lc rgbcolor \"#399320\"\n")))
