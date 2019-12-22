@@ -5,10 +5,10 @@
   which you can use to keep track of which things you do on which
   days.
 
-  [[https://github.com/ianxm/emacs-tracker][tracker.el]] gives emacs the capability to generate tables and charts
+  [[https://github.com/ianxm/emacs-tracker][diary-metrics.el]] gives emacs the capability to generate tables and charts
   from the personal metrics data found in your diary entries.
 
-  using tracker.el, you can use your emacs diary to track daily
+  using diary-metrics.el, you can use your emacs diary to track daily
   personal metrics.  each metric is a count of something per day.  the
   point is to measure behaviors that you are trying to increase (like
   exercise) or decrease (like watching buffy the vampire slayer) so
@@ -22,7 +22,7 @@
 
    metrics entries are regular diary entries so they can be created by
    updating the diary in the normal way, but diary entries that aren't
-   in a certain format will be ignored by tracker.
+   in a certain format will be ignored by diary-metrics.
 
    tip: consider using abbrev mode in diary mode and setting
    abbreviations for your metrics to save yourself a few keystrokes.
@@ -30,7 +30,7 @@
 *** diary entry format
 
    emacs is very loose on diary entry formatting, but entries that
-   tracker.el uses must look like:
+   diary-metrics.el uses must look like:
 
 #+BEGIN_SRC
    [date] [metric-name] [value]
@@ -39,7 +39,7 @@
    where,
    - date :: the date of a particular day.  although the emacs diary
              allows dates like "wednesday," which applies to all
-             wednesdays, tracker.el only uses dates for specific days.
+             wednesdays, diary-metrics.el only uses dates for specific days.
              examples of valid dates are:
              - ~2020-01-01~
              - ~1 Jan 2020~
@@ -47,18 +47,18 @@
    - metric-name :: is any string.  it can be as long as you like and
                     can include spaces but keeping them short helps
                     with readability.
-   - value :: is a number (integer or decimal).  tracker.el doesn't
+   - value :: is a number (integer or decimal).  diary-metrics.el doesn't
               care about units.  ~value~ is just a number.  if you're
               tracking how much tv you watch, a "4" could mean 4 shows
               or 4 hours; it's up to you.
 
 *** whitelist / blacklist
 
-    by default tracker.el will pick up any diary entries that match
+    by default diary-metrics.el will pick up any diary entries that match
     the format it is looking for, which means it might pick up entries
     you don't want in your report.  if there are a few metrics that
     get picked up that you don't want to see, you can exclude them by
-    adding them to ~tracker-metric-names-blacklist~.  this custom
+    adding them to ~diary-metrics-metric-names-blacklist~.  this custom
     variable takes a list of metric names as a list of strings, such
     as:
 
@@ -66,26 +66,26 @@
    '("pushups" "situps")
 #+end_SRC
 
-    if tracker.el picks up lots of metrics that you don't want to see,
+    if diary-metrics.el picks up lots of metrics that you don't want to see,
     you could instead whitelist the ones you want by adding them to
-    the ~tracker-metric-names-whitelist~ custom variable.  this uses
-    the same format as ~tracker-metric-names-blacklist~.  if you
+    the ~diary-metrics-metric-names-whitelist~ custom variable.  this uses
+    the same format as ~diary-metrics-metric-names-blacklist~.  if you
     specify a whitelist, only those are considered and the blacklist
     is ignored.
 
 ** reporting
 
-   tracker.el provides the following ways to view the metrics data in
+   diary-metrics.el provides the following ways to view the metrics data in
    your diary.
 
 *** list
 
 #+BEGIN_SRC
-    M-x tracker-list
+    M-x diary-metrics-list
 #+END_SRC
 
     this creates a table containing all of the metrics found in your
-    emacs diary.  tracker write out a table containing the following
+    emacs diary.  diary-metrics write out a table containing the following
     columns:
     - metric :: the metric name
     - count :: the number of entries for this metric
@@ -106,7 +106,7 @@
 *** table
 
 #+BEGIN_SRC
-    M-x tracker-table
+    M-x diary-metrics-table
 #+END_SRC
 
     emacs will prompt for the following input parameters:
@@ -146,17 +146,17 @@
 
 *** graph
 
-    tracker.el can take the same table data and use it to generate a
+    diary-metrics.el can take the same table data and use it to generate a
     graph.  it uses gnuplot for graph generation, so gnuplot must be
     installed on your system and available on your PATH.  I tested
     with gnuplot 5.0.
 
 #+BEGIN_SRC
-    M-x tracker-graph
+    M-x diary-metrics-graph
 #+END_SRC
 
     emacs will prompt for the same input parameters as in
-    ~tracker-table~ above, as well as:
+    ~diary-metrics-table~ above, as well as:
     - graph-type :: the type of graph to render. one of:
       - line
       - bar
@@ -199,7 +199,7 @@
     [[./doc/commute_by_week.png]]
 
     the dimensions of the image can be set by modifying the variable
-    `tracker-graph-size`.
+    `diary-metrics-graph-size`.
 
 * todo
   - narrow mode in the output

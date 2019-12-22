@@ -1,4 +1,4 @@
-;;; tracker.el --- Generate diagrams of personal metrics from diary entries  -*- lexical-binding: t -*-
+;;; diary-metrics.el --- Generate diagrams of personal metrics from diary entries  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2019 Ian Martins
 
@@ -25,7 +25,7 @@
 
 ;;; Commentary:
 
-;; tracker.el generates tables and charts from the personal metrics
+;; diary-metrics.el generates tables and charts from the personal metrics
 ;; data found in your diary entries.
 
 ;;; Code:
@@ -35,50 +35,53 @@
 (require 'calendar)
 (require 'org-table)
 
-(defcustom tracker-graph-size '(700 . 500)
+(defcustom diary-metrics-graph-size '(700 . 500)
   "Specifies the size as (width . height) to be used for graph images."
   :type '(cons integer integer)
-  :group 'tracker)
+  :group 'diary-metrics)
 
-(defcustom tracker-metric-name-whitelist nil
+(defcustom diary-metrics-metric-name-whitelist nil
   "A list of metric names to include in reports.
 If this is specified, only the metrics in this list are
 considered.  All others are filtered out.  If this is set, then
-`tracker-metric-name-blacklist' has no effect.
+`diary-metrics-metric-name-blacklist' has no effect.
 
 For example: '(\"pushups\" \"situps\")"
   :type '(list :inline t string)
-  :group 'tracker)
+  :group 'diary-metrics)
 
-(defcustom tracker-metric-name-blacklist nil
+(defcustom diary-metrics-metric-name-blacklist nil
   "A list of metric names to exclude from reports.
-This is ignored if `tracker-metric-name-whitelist' is set.
+This is ignored if `diary-metrics-metric-name-whitelist' is set.
 
 For example: '(\"pushups\" \"situps\")"
   :type '(list :inline t string)
-  :group 'tracker)
+  :group 'diary-metrics)
 
-(defvar tracker-metric-index nil
+(defvar diary-metrics-metric-index nil
   "This is the list of metrics read from the diary file.
 It is a list containing: (name count first last) for each metric.
-It is cleared when the tracker output buffer is killed, forcing
+It is cleared when the diary-metrics output buffer is killed, forcing
 the diary file to be re-read if the data is needed again.")
 
-(defvar tracker-tempfiles nil
+(defvar diary-metrics-tempfiles nil
   "This is the list of tempfiles (graph images) that have been created during the current session.")
 
-(defvar tracker-metric-names (make-vector 5 0)
+(defvar diary-metrics-metric-names (make-vector 5 0)
   "This is an obarray of all existing metric names.")
 
-(defmacro tracker--min-date (d1 d2)
+(defconst diary-metrics-output-buffer-name "*Diary Metrics Output*"
+  "The name of the output buffer.")
+
+(defmacro diary-metrics--min-date (d1 d2)
   "Return the earlier of the given dates D1 and D2."
   `(if (time-less-p ,d1 ,d2) ,d1 ,d2))
 
-(defmacro tracker--max-date (d1 d2)
+(defmacro diary-metrics--max-date (d1 d2)
   "Return the later of the given dates D1 and D2."
   `(if (time-less-p ,d1 ,d2) ,d2 ,d1))
 
-(defun tracker--process-diary (filter action)
+(defun diary-metrics--process-diary (filter action)
   "Read the diary file.
 For each valid metrics entry found, parse the fields and then
 apply the given FILTER and ACTION."
@@ -94,49 +97,49 @@ apply the given FILTER and ACTION."
           (if (string-match format line)
               (setq metric-date (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                                              (seq-take (parse-time-string (match-string 1 line)) 6)))
-                    metric-name (intern (match-string 2 line) tracker-metric-names)
+                    metric-name (intern (match-string 2 line) diary-metrics-metric-names)
                     metric-value (string-to-number (match-string 3 line))
                     foundp t)))
         (if (and foundp (funcall filter metric-date metric-name))
             (funcall action metric-date metric-name metric-value))))))
 
-(defun tracker-clear-data ()
+(defun diary-metrics-clear-data ()
   "Clear cached data and delete tempfiles.
-Clear the data cached in `tracker-metric-index' in order to force
+Clear the data cached in `diary-metrics-metric-index' in order to force
 it to be re-read from the diary file the next time it is
 needed.  Also delete the tempfiles (graph images) listed in
-`tracker-tempfiles'."
-  (when (string= (buffer-name (current-buffer)) "*Tracker Output*")
-    (setq tracker-metric-index nil)
-    (tracker-remove-tempfiles)
-    (remove-hook 'kill-buffer-hook #'tracker-clear-data)))
+`diary-metrics-tempfiles'."
+  (when (string= (buffer-name (current-buffer)) diary-metrics-output-buffer-name)
+    (setq diary-metrics-metric-index nil)
+    (diary-metrics-remove-tempfiles)
+    (remove-hook 'kill-buffer-hook #'diary-metrics-clear-data)))
 
-(defun tracker-remove-tempfiles ()
+(defun diary-metrics-remove-tempfiles ()
   "Remove any tempfiles (graph images) that were created during the current session."
-  (dolist (elt tracker-tempfiles)
+  (dolist (elt diary-metrics-tempfiles)
     (if (file-exists-p elt)
         (delete-file elt)))
-  (setq tracker-tempfiles nil)
-  (remove-hook 'kill-emacs-hook #'tracker-remove-tempfiles))
+  (setq diary-metrics-tempfiles nil)
+  (remove-hook 'kill-emacs-hook #'diary-metrics-remove-tempfiles))
 
-(defun tracker--load-index ()
+(defun diary-metrics--load-index ()
   "Make sure the metric index has been populated.
-This reads the diary file and fills in `tracker-metric-list' if
+This reads the diary file and fills in `diary-metrics-metric-list' if
 it is nil.
 
-`tracker-metric-list' is a list of (metric-name count first last)
+`diary-metrics-metric-list' is a list of (metric-name count first last)
 sorted by 'last'."
-  (unless tracker-metric-index
+  (unless diary-metrics-metric-index
     (let* (metrics ; will contain plist of metric-name -> (metric-name count first last since)
            existing-metric
            (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                                (seq-take (parse-time-string (format-time-string "%F")) 6))))
-           (list-filter-fcn (cond ((not (null tracker-metric-name-whitelist))
+           (list-filter-fcn (cond ((not (null diary-metrics-metric-name-whitelist))
                                    (lambda (_date name) ; filter out non-whitelisted metrics
-                                     (seq-contains tracker-metric-name-whitelist (symbol-name name))))
-                                  ((not (null tracker-metric-name-blacklist))
+                                     (seq-contains diary-metrics-metric-name-whitelist (symbol-name name))))
+                                  ((not (null diary-metrics-metric-name-blacklist))
                                    (lambda (_date name) ; filter out blacklisted metrics
-                                     (not (seq-contains tracker-metric-name-blacklist (symbol-name name)))))
+                                     (not (seq-contains diary-metrics-metric-name-blacklist (symbol-name name)))))
                                   (t                    ; keep all metrics
                                    (lambda (_date _name) t))))
            (list-action-fcn (lambda (date name _value)
@@ -146,38 +149,38 @@ sorted by 'last'."
                                                            (list name 1 date date (- (time-to-days today)
                                                                                      (time-to-days date)))))
                                 (setcar (nthcdr 1 existing-metric) (1+ (nth 1 existing-metric)))
-                                (setcar (nthcdr 2 existing-metric) (tracker--min-date (nth 2 existing-metric) date))
-                                (setcar (nthcdr 3 existing-metric) (tracker--max-date (nth 3 existing-metric) date))
+                                (setcar (nthcdr 2 existing-metric) (diary-metrics--min-date (nth 2 existing-metric) date))
+                                (setcar (nthcdr 3 existing-metric) (diary-metrics--max-date (nth 3 existing-metric) date))
                                 (setcar (nthcdr 4 existing-metric) (- (time-to-days today)
                                                                       (time-to-days (nth 3 existing-metric))))))))
 
       ;; read the diary file, fill `metrics' plist with "name -> (name count first last)"
-      (tracker--process-diary list-filter-fcn list-action-fcn)
+      (diary-metrics--process-diary list-filter-fcn list-action-fcn)
 
       ;; get the property values from the `metrics' plist
       (let ((metric-iter metrics))
         (while (cdr metric-iter)
           (setq metric-iter (cdr metric-iter)
-                tracker-metric-index (cons (car metric-iter) tracker-metric-index)
+                diary-metrics-metric-index (cons (car metric-iter) diary-metrics-metric-index)
                 metric-iter (cdr metric-iter))))
 
       ;; sort by last update date
-      (setq tracker-metric-index (sort tracker-metric-index (lambda (a b) (> (nth 4 b) (nth 4 a)))))
-      (add-hook 'kill-buffer-hook #'tracker-clear-data))))
+      (setq diary-metrics-metric-index (sort diary-metrics-metric-index (lambda (a b) (> (nth 4 b) (nth 4 a)))))
+      (add-hook 'kill-buffer-hook #'diary-metrics-clear-data))))
 
 ;;;###autoload
-(defun tracker-list ()
+(defun diary-metrics-list ()
   "Display a list of all saved metrics in the output buffer.
 This reads the diary file."
   (interactive)
 
-  (tracker--load-index)
+  (diary-metrics--load-index)
 
-  (tracker--setup-output-buffer)
+  (diary-metrics--setup-output-buffer)
 
   (insert "| metric | count | first | last | days ago |\n") ; header
   (insert "|--\n")
-  (dolist (metric tracker-metric-index)
+  (dolist (metric diary-metrics-metric-index)
     (insert (format "| %s | %s | %s | %s | %s |\n"      ; data
                     (nth 0 metric)
                     (nth 1 metric)
@@ -187,9 +190,9 @@ This reads the diary file."
   (goto-char (point-min))
   (orgtbl-mode t)
   (org-ctrl-c-ctrl-c)
-  (tracker--show-output-buffer))
+  (diary-metrics--show-output-buffer))
 
-(defvar tracker-grouping-and-transform-options
+(defvar diary-metrics-grouping-and-transform-options
   '(day (total count)
         week (total count percent per-day)
         month (total count percent per-day per-week)
@@ -197,21 +200,21 @@ This reads the diary file."
         full (total count percent per-day per-week per-month per-year))
   "This is a plist of date-grouping options mapped to value-transform options.")
 
-(defun tracker--date-grouping-options ()
-  "Pull the list of date-grouping options out of `tracker-grouping-and-transform-options'."
-  (seq-filter (lambda (x) (symbolp x)) tracker-grouping-and-transform-options))
+(defun diary-metrics--date-grouping-options ()
+  "Pull the list of date-grouping options out of `diary-metrics-grouping-and-transform-options'."
+  (seq-filter (lambda (x) (symbolp x)) diary-metrics-grouping-and-transform-options))
 
-(defun tracker--value-transform-options (date-grouping)
+(defun diary-metrics--value-transform-options (date-grouping)
   "Look up the valid value-transforms for the given DATE-GROUPING."
-  (plist-get tracker-grouping-and-transform-options date-grouping))
+  (plist-get diary-metrics-grouping-and-transform-options date-grouping))
 
-(defvar tracker-graph-options '(line bar scatter)
+(defvar diary-metrics-graph-options '(line bar scatter)
   "The types of supported graphs.")
 
-(defvar tracker-graph-output-options '(ascii svg png)
+(defvar diary-metrics-graph-output-options '(ascii svg png)
   "The graph output options.")
 
-(defun tracker--date-to-bin (date date-grouping)
+(defun diary-metrics--date-to-bin (date date-grouping)
   "Return the start date of the bin containing DATE of size DATE-GROUPING."
   (if (eq date-grouping 'full)
       'full
@@ -226,7 +229,7 @@ This reads the diary file."
                    (nth 4 date-fields)
                    (nth 5 date-fields)))))
 
-(defun tracker--date-to-next-bin (date date-grouping)
+(defun diary-metrics--date-to-next-bin (date date-grouping)
   "Return the start date at the bin following the bin containing DATE of size DATE-GROUPING."
   (if (eq date-grouping 'full)
       'full
@@ -251,7 +254,7 @@ This reads the diary file."
       ;; return next-date
       next-date)))
 
-(defun tracker--val-to-bin (value value-transform)
+(defun diary-metrics--val-to-bin (value value-transform)
   "Convert the VALUE to be stored for the bin based on VALUE-TRANSFORM.
 Either save the total value or a count of occurrences."
   (cond
@@ -259,7 +262,7 @@ Either save the total value or a count of occurrences."
    ((eq value-transform 'percent) 1)
    (t value)))
 
-(defun tracker--format-bin (date-grouping)
+(defun diary-metrics--format-bin (date-grouping)
   "Get the format string for the the bin based on the DATE-GROUPING."
   (cond
    ((eq date-grouping 'day) "%Y-%m-%d")
@@ -267,7 +270,7 @@ Either save the total value or a count of occurrences."
    ((eq date-grouping 'month) "%Y-%m")
    ((eq date-grouping 'year) "%Y")))
 
-(defun tracker--trim-duration (span bin-start first-date last-date)
+(defun diary-metrics--trim-duration (span bin-start first-date last-date)
   "Trim the given duration if it falls outside of first and last dates.
 
 If part of the bin SPAN days long and starting at BIN-START falls
@@ -285,12 +288,12 @@ days within the bin and inside of FIRST-DATE and LAST-DATE."
      (t
       (float span)))))
 
-(defun tracker--days-of-month (date)
+(defun diary-metrics--days-of-month (date)
   "Find the number of days in the month containing DATE.  This depends on `timezeone'."
   (let ((date-fields (decode-time date)))
     (timezone-last-day-of-month (nth 4 date-fields) (nth 5 date-fields))))
 
-(defun tracker--bin-to-val (value
+(defun diary-metrics--bin-to-val (value
                             value-transform date-grouping
                             bin-date first-date today)
   "Transform and format the bin VALUE into the value used in reporting.
@@ -300,9 +303,9 @@ to transform the value.  BIN-DATE, FIRST-DATE, TODAY are all
 needed to determine the number of days in the current bin."
   (let ((bin-duration (cond
                        ((eq date-grouping 'day) 1.0)
-                       ((eq date-grouping 'week) (tracker--trim-duration 7 bin-date first-date today))
-                       ((eq date-grouping 'month) (tracker--trim-duration (tracker--days-of-month bin-date) bin-date first-date today))
-                       ((eq date-grouping 'year) (tracker--trim-duration 365 bin-date first-date today))
+                       ((eq date-grouping 'week) (diary-metrics--trim-duration 7 bin-date first-date today))
+                       ((eq date-grouping 'month) (diary-metrics--trim-duration (diary-metrics--days-of-month bin-date) bin-date first-date today))
+                       ((eq date-grouping 'year) (diary-metrics--trim-duration 365 bin-date first-date today))
                        ((eq date-grouping 'full) (float (- (time-to-days today)
                                                            (time-to-days first-date)))))))
     (cond
@@ -314,33 +317,33 @@ needed to determine the number of days in the current bin."
      ((eq value-transform 'per-month) (format "%.1f" (* value (/ 30 bin-duration))))
      ((eq value-transform 'per-year) (format "%.1f" (* value (/ 365 bin-duration)))))))
 
-(defun tracker--bin-metric-data (metric-name date-grouping value-transform today)
+(defun diary-metrics--bin-metric-data (metric-name date-grouping value-transform today)
   "Read the requested metric data from the diary.
 Only keep entries for METRIC-NAME.  Apply DATE-GROUPING and
 VALUE-TRANSFORM.  Fill gaps ending at TODAY.  Return the sorted
 bin data as (list (date . pretransformed-value))."
   (let* ((bin-data (make-hash-table :test 'equal))
-         (first-date (nth 2 (nth 0 (seq-filter (lambda (item) (eq (car item) metric-name)) tracker-metric-index))))
-         (first-date-bin (tracker--date-to-bin first-date date-grouping))
-         (today-bin (tracker--date-to-bin today date-grouping))
+         (first-date (nth 2 (nth 0 (seq-filter (lambda (item) (eq (car item) metric-name)) diary-metrics-metric-index))))
+         (first-date-bin (diary-metrics--date-to-bin first-date date-grouping))
+         (today-bin (diary-metrics--date-to-bin today date-grouping))
          date-bin found-value
          (table-filter-fcn (lambda (_date name)
                              (eq name metric-name)))
          (table-action-fcn (lambda (date _name value)
-                             (setq date-bin (tracker--date-to-bin date date-grouping)
+                             (setq date-bin (diary-metrics--date-to-bin date date-grouping)
                                    found-value (gethash date-bin bin-data))
                              (if found-value
-                                 (puthash date-bin (+ found-value (tracker--val-to-bin value value-transform)) bin-data)
-                               (puthash date-bin (tracker--val-to-bin value value-transform) bin-data))))
+                                 (puthash date-bin (+ found-value (diary-metrics--val-to-bin value value-transform)) bin-data)
+                               (puthash date-bin (diary-metrics--val-to-bin value value-transform) bin-data))))
          sorted-bin-data)
 
-    (tracker--process-diary table-filter-fcn table-action-fcn)
+    (diary-metrics--process-diary table-filter-fcn table-action-fcn)
 
     ;; fill gaps
     (unless (eq date-grouping 'full)
       (let ((current-date-bin first-date-bin))
         (while (time-less-p current-date-bin today-bin)
-          (setq current-date-bin (tracker--date-to-next-bin current-date-bin date-grouping)) ; increment to next bin
+          (setq current-date-bin (diary-metrics--date-to-next-bin current-date-bin date-grouping)) ; increment to next bin
           (unless (gethash current-date-bin bin-data)
             (puthash current-date-bin 0 bin-data)))))
 
@@ -350,46 +353,46 @@ bin data as (list (date . pretransformed-value))."
 
     ;; apply value transform (old cdr was count or total, new cdr is requested value transform)
     (dolist (bin sorted-bin-data)
-      (setcdr bin (tracker--bin-to-val (cdr bin) value-transform date-grouping
+      (setcdr bin (diary-metrics--bin-to-val (cdr bin) value-transform date-grouping
                                        (car bin) first-date today)))
     sorted-bin-data))
 
-(defun tracker--setup-output-buffer ()
+(defun diary-metrics--setup-output-buffer ()
   "Create and clear the output buffer."
-  (let ((buffer (get-buffer-create "*Tracker Output*")))
+  (let ((buffer (get-buffer-create diary-metrics-output-buffer-name)))
     (set-buffer buffer)
     (read-only-mode -1)
     (erase-buffer)))
 
-(defun tracker--show-output-buffer ()
+(defun diary-metrics--show-output-buffer ()
   "Show the output buffer."
-  (let ((buffer (get-buffer "*Tracker Output*")))
+  (let ((buffer (get-buffer diary-metrics-output-buffer-name)))
     (set-buffer buffer)
     (read-only-mode 1)
     (set-window-buffer (selected-window) buffer)))
 
-(defun tracker--check-gnuplot-exists ()
+(defun diary-metrics--check-gnuplot-exists ()
   "Check if gnuplot is installed on the system."
   (unless (eq 0 (call-process-shell-command "gnuplot --version"))
     (error "Cannot find gnuplot")))
 
 ;;;###autoload
-(defun tracker-table ()
+(defun diary-metrics-table ()
   "Get a tabular view of the requested metric."
   (interactive)
 
-  ;; make sure `tracker-metric-index' has been populated
-  (tracker--load-index)
+  ;; make sure `diary-metrics-metric-index' has been populated
+  (diary-metrics--load-index)
 
-  (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
+  (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) diary-metrics-metric-index))
          (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                              (seq-take (parse-time-string (format-time-string "%F")) 6))))
          ;; ask for params
-         (metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names))
-         (date-grouping (intern (completing-read "Group dates by: " (tracker--date-grouping-options) nil t nil nil "month")))
-         (value-transform (intern (completing-read "Value transform: " (tracker--value-transform-options date-grouping) nil t nil nil "total")))
+         (metric-name (intern (completing-read "Metric: " all-metric-names nil t) diary-metrics-metric-names))
+         (date-grouping (intern (completing-read "Group dates by: " (diary-metrics--date-grouping-options) nil t nil nil "month")))
+         (value-transform (intern (completing-read "Value transform: " (diary-metrics--value-transform-options date-grouping) nil t nil nil "total")))
          ;; load metric data into bins
-         (sorted-bin-data (tracker--bin-metric-data metric-name date-grouping value-transform today)))
+         (sorted-bin-data (diary-metrics--bin-metric-data metric-name date-grouping value-transform today)))
 
     ;; print
     (if (eq date-grouping 'full)
@@ -398,9 +401,9 @@ bin data as (list (date . pretransformed-value))."
                  (replace-regexp-in-string "-" " " (symbol-name value-transform))
                  (cdar sorted-bin-data))
 
-      (tracker--setup-output-buffer)
+      (diary-metrics--setup-output-buffer)
 
-      (set-buffer "*Tracker Output*")
+      (set-buffer diary-metrics-output-buffer-name)
       (insert (format "| %s | %s %s |\n" ; header
                       date-grouping
                       metric-name
@@ -408,16 +411,16 @@ bin data as (list (date . pretransformed-value))."
       (insert "|--\n")
       (dolist (bin sorted-bin-data)
         (insert (format "| %s | %s |\n"  ; data
-                        (format-time-string (tracker--format-bin date-grouping) (car bin))
+                        (format-time-string (diary-metrics--format-bin date-grouping) (car bin))
                         (cdr bin))))
       (goto-char (point-min))
       (orgtbl-mode t)
       (org-ctrl-c-ctrl-c)
 
-      (tracker--show-output-buffer))))
+      (diary-metrics--show-output-buffer))))
 
 
-(defun tracker--make-gnuplot-config (metric-name
+(defun diary-metrics--make-gnuplot-config (metric-name
                                      date-grouping value-transform
                                      sorted-bin-data
                                      graph-type graph-output fname)
@@ -425,12 +428,12 @@ bin data as (list (date . pretransformed-value))."
 The gnuplot config depends on many variables which must all be
 passed in: METRIC-NAME, DATE-GROUPING, VALUE-TRANSFORM,
 SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
-  (let ((date-format (tracker--format-bin date-grouping))
+  (let ((date-format (diary-metrics--format-bin date-grouping))
         (term (cond ((eq graph-output 'svg) "svg")
                     ((eq graph-output 'png) "pngcairo")
                     (t "dumb")))
-        (width (if (eq graph-output 'ascii) (1- (window-width)) (car tracker-graph-size)))
-        (height (if (eq graph-output 'ascii) (1- (window-height)) (cdr tracker-graph-size))))
+        (width (if (eq graph-output 'ascii) (1- (window-width)) (car diary-metrics-graph-size)))
+        (height (if (eq graph-output 'ascii) (1- (window-height)) (cdr diary-metrics-graph-size))))
     (cond ((eq graph-output 'ascii)
            (insert (format "set term %s size %d, %d\n\n" term width height))
            (insert (format "set title \"%s %s\"\n"
@@ -470,41 +473,41 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
     (insert "\ne")))
 
 ;;;###autoload
-(defun tracker-graph ()
+(defun diary-metrics-graph ()
   "Get a graph of the requested metric."
   (interactive)
 
-  (tracker--check-gnuplot-exists)
+  (diary-metrics--check-gnuplot-exists)
 
-  ;; make sure `tracker-metric-index' has been populated
-  (tracker--load-index)
+  ;; make sure `diary-metrics-metric-index' has been populated
+  (diary-metrics--load-index)
 
-  (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
+  (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) diary-metrics-metric-index))
          (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                              (seq-take (parse-time-string (format-time-string "%F")) 6))))
          ;; ask for params
-         (metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names))
-         (date-grouping (intern (completing-read "Group dates by: " (tracker--date-grouping-options) nil t nil nil "month")))
-         (value-transform (intern (completing-read "Value transform: " (tracker--value-transform-options date-grouping) nil t nil nil "total")))
-         (graph-type (intern (completing-read "Graph type: " tracker-graph-options nil t nil nil "line")))
-         (graph-output (intern (completing-read "Graph output: " tracker-graph-output-options nil t nil nil "ascii")))
+         (metric-name (intern (completing-read "Metric: " all-metric-names nil t) diary-metrics-metric-names))
+         (date-grouping (intern (completing-read "Group dates by: " (diary-metrics--date-grouping-options) nil t nil nil "month")))
+         (value-transform (intern (completing-read "Value transform: " (diary-metrics--value-transform-options date-grouping) nil t nil nil "total")))
+         (graph-type (intern (completing-read "Graph type: " diary-metrics-graph-options nil t nil nil "line")))
+         (graph-output (intern (completing-read "Graph output: " diary-metrics-graph-output-options nil t nil nil "ascii")))
          ;; load metric data into bins
-         (sorted-bin-data (tracker--bin-metric-data metric-name date-grouping value-transform today))
+         (sorted-bin-data (diary-metrics--bin-metric-data metric-name date-grouping value-transform today))
          ;; prep output buffer
-         (buffer (get-buffer-create "*Tracker Output*"))
-         (fname (and (not (eq graph-output 'ascii)) (make-temp-file "tracker"))))
+         (buffer (get-buffer-create diary-metrics-output-buffer-name))
+         (fname (and (not (eq graph-output 'ascii)) (make-temp-file "diary-metrics"))))
 
     (with-temp-buffer
-      (tracker--make-gnuplot-config metric-name
+      (diary-metrics--make-gnuplot-config metric-name
                                     date-grouping value-transform
                                     sorted-bin-data
                                     graph-type graph-output fname)
       (save-current-buffer
-        (tracker--setup-output-buffer))
+        (diary-metrics--setup-output-buffer))
 
       (unless (null fname)
-        (setq tracker-tempfiles (cons fname tracker-tempfiles)) ; keep track of it so we can delete it
-        (add-hook 'kill-emacs-hook #'tracker-remove-tempfiles))
+        (setq diary-metrics-tempfiles (cons fname diary-metrics-tempfiles)) ; keep track of it so we can delete it
+        (add-hook 'kill-emacs-hook #'diary-metrics-remove-tempfiles))
       (call-process-region (point-min) (point-max) "gnuplot" nil buffer)
       (set-buffer buffer)
       (goto-char (point-min))
@@ -515,8 +518,8 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
         (insert "\n")
         (goto-char (point-min)))
 
-      (tracker--show-output-buffer))))
+      (diary-metrics--show-output-buffer))))
 
-(provide 'tracker)
+(provide 'diary-metrics)
 
-;;; tracker.el ends here
+;;; diary-metrics.el ends here
