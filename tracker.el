@@ -32,6 +32,8 @@
 
 (require 'seq)
 (require 'timezone)
+(require 'calendar)
+(require 'org-table)
 
 (defcustom tracker-graph-size '(700 . 500)
   "Specifies the size as (width . height) to be used for graph images."
@@ -90,8 +92,8 @@ apply the given FILTER and ACTION."
         (setq foundp nil)
         (dolist (format valid-formats)
           (if (string-match format line)
-              (setq metric-date (apply 'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
-                                                            (seq-take (parse-time-string (match-string 1 line)) 6)))
+              (setq metric-date (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                                                             (seq-take (parse-time-string (match-string 1 line)) 6)))
                     metric-name (intern (match-string 2 line) tracker-metric-names)
                     metric-value (string-to-number (match-string 3 line))
                     foundp t)))
@@ -124,11 +126,11 @@ it is nil.
 
 `tracker-metric-list' is a list of (metric-name count first last)
 sorted by 'last'."
-  (when (not tracker-metric-index)
+  (unless tracker-metric-index
     (let* (metrics ; will contain plist of metric-name -> (metric-name count first last since)
            existing-metric
-           (today (apply 'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
-                                              (seq-take (parse-time-string (format-time-string "%F")) 6))))
+           (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                                               (seq-take (parse-time-string (format-time-string "%F")) 6))))
            (list-filter-fcn (cond ((not (null tracker-metric-name-whitelist))
                                    (lambda (_date name) ; filter out non-whitelisted metrics
                                      (seq-contains tracker-metric-name-whitelist (symbol-name name))))
@@ -189,10 +191,10 @@ This reads the diary file."
 
 (defvar tracker-grouping-and-transform-options
   '(day (total count)
-    week (total count percent per-day)
-    month (total count percent per-day per-week)
-    year (total count percent per-day per-week per-month)
-    full (total count percent per-day per-week per-month per-year))
+        week (total count percent per-day)
+        month (total count percent per-day per-week)
+        year (total count percent per-day per-week per-month)
+        full (total count percent per-day per-week per-month per-year))
   "This is a plist of date-grouping options mapped to value-transform options.")
 
 (defun tracker--date-grouping-options ()
@@ -237,11 +239,11 @@ This reads the diary file."
        ((eq date-grouping 'week) (setcar (nthcdr 3 next-date-fields) (+ 7 (nth 3 next-date-fields))))
        ((eq date-grouping 'month) (setcar (nthcdr 4 next-date-fields) (1+ (nth 4 next-date-fields))))
        ((eq date-grouping 'year) (setcar (nthcdr 5 next-date-fields) (1+ (nth 5 next-date-fields)))))
-      (setq next-date (apply 'encode-time next-date-fields))
+      (setq next-date (apply #'encode-time next-date-fields))
       (setq next-date-fields (decode-time next-date))
       ;; suppress daylight savings shifts
       (when (and (not is-dst)
-               (nth 7 next-date-fields))
+                 (nth 7 next-date-fields))
         (setq next-date (seq-take (time-subtract next-date (seconds-to-time 3600)) 2)))
       (when (and is-dst
                  (not (nth 7 next-date-fields)))
@@ -260,10 +262,10 @@ Either save the total value or a count of occurrences."
 (defun tracker--format-bin (date-grouping)
   "Get the format string for the the bin based on the DATE-GROUPING."
   (cond
-       ((eq date-grouping 'day) "%Y-%m-%d")
-       ((eq date-grouping 'week) "%Y-%m-%d")
-       ((eq date-grouping 'month) "%Y-%m")
-       ((eq date-grouping 'year) "%Y")))
+   ((eq date-grouping 'day) "%Y-%m-%d")
+   ((eq date-grouping 'week) "%Y-%m-%d")
+   ((eq date-grouping 'month) "%Y-%m")
+   ((eq date-grouping 'year) "%Y")))
 
 (defun tracker--trim-duration (span bin-start first-date last-date)
   "Trim the given duration if it falls outside of first and last dates.
@@ -355,17 +357,16 @@ bin data as (list (date . pretransformed-value))."
 (defun tracker--setup-output-buffer ()
   "Create and clear the output buffer."
   (let ((buffer (get-buffer-create "*Tracker Output*")))
-      (set-buffer buffer)
-      (read-only-mode -1)
-      (erase-buffer)))
+    (set-buffer buffer)
+    (read-only-mode -1)
+    (erase-buffer)))
 
 (defun tracker--show-output-buffer ()
   "Show the output buffer."
   (let ((buffer (get-buffer "*Tracker Output*")))
     (set-buffer buffer)
     (read-only-mode 1)
-    (set-window-buffer (selected-window) buffer))
-  )
+    (set-window-buffer (selected-window) buffer)))
 
 (defun tracker--check-gnuplot-exists ()
   "Check if gnuplot is installed on the system."
@@ -374,15 +375,15 @@ bin data as (list (date . pretransformed-value))."
 
 ;;;###autoload
 (defun tracker-table ()
-   "Get a tabular view of the requested metric."
+  "Get a tabular view of the requested metric."
   (interactive)
 
   ;; make sure `tracker-metric-index' has been populated
   (tracker--load-index)
 
   (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
-         (today (apply 'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
-                                                        (seq-take (parse-time-string (format-time-string "%F")) 6))))
+         (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                                             (seq-take (parse-time-string (format-time-string "%F")) 6))))
          ;; ask for params
          (metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names))
          (date-grouping (intern (completing-read "Group dates by: " (tracker--date-grouping-options) nil t nil nil "month")))
@@ -479,8 +480,8 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
   (tracker--load-index)
 
   (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) tracker-metric-index))
-         (today (apply 'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
-                                                        (seq-take (parse-time-string (format-time-string "%F")) 6))))
+         (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                                             (seq-take (parse-time-string (format-time-string "%F")) 6))))
          ;; ask for params
          (metric-name (intern (completing-read "Metric: " all-metric-names nil t) tracker-metric-names))
          (date-grouping (intern (completing-read "Group dates by: " (tracker--date-grouping-options) nil t nil nil "month")))

@@ -202,11 +202,11 @@
     `tracker-graph-size`.
 
 * todo
-  - allow other diary formats
-    - if no value, assume 1?
+  - narrow mode in the output
   - reports
     - cal
     - streaks
     - bursts
     - records
   - report with multiple metrics (accept formulas)
+  - sync to cloud
