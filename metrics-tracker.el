@@ -178,15 +178,15 @@ This reads the diary file."
 
   (metrics-tracker--setup-output-buffer)
 
-  (insert "| metric | count | first | last | days ago |\n") ; header
+  (insert "| metric | days ago | first | last | count |\n") ; header
   (insert "|--\n")
   (dolist (metric metrics-tracker-metric-index)
     (insert (format "| %s | %s | %s | %s | %s |\n"      ; data
                     (nth 0 metric)
-                    (nth 1 metric)
+                    (nth 4 metric)
                     (format-time-string "%F" (nth 2 metric))
                     (format-time-string "%F" (nth 3 metric))
-                    (nth 4 metric))))
+                    (nth 1 metric))))
   (goto-char (point-min))
   (orgtbl-mode t)
   (org-ctrl-c-ctrl-c)

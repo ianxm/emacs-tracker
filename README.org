@@ -88,19 +88,19 @@
     emacs diary.  metrics-tracker write out a table containing the following
     columns:
     - metric :: the metric name
-    - count :: the number of entries for this metric
+    - days ago :: the number of days since "last"
     - first :: the date of the first entry
     - last :: the date of the last entry
-    - days ago :: the number of days since "last"
+    - count :: the number of entries for this metric
 
     here's an example:
 
 #+BEGIN_SRC org-mode
 | metric         | count |      first |       last | days ago |
 |----------------+-------+------------+------------+----------|
-| emacs-tracker  |    14 | 2019-11-23 | 2019-12-18 |        0 |
-| beer           |  1345 | 2012-02-13 | 2019-12-14 |        4 |
-| commute        |  1774 | 2006-05-22 | 2019-10-25 |       54 |
+| emacs-tracker  |    17 | 2019-11-23 | 2019-12-25 |        0 |
+| beer           |  1348 | 2012-02-13 | 2019-12-24 |        1 |
+| commute        |  1774 | 2006-05-22 | 2019-10-25 |       61 |
 #+END_SRC
 
 *** table
@@ -208,5 +208,6 @@
     - streaks
     - bursts
     - records
-  - report with multiple metrics (accept formulas)
+  - report with multiple metrics as separate series
+  - combine multiple metrics with formulas
   - sync to cloud
