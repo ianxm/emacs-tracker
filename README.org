@@ -101,7 +101,7 @@
     here's an example:
 
 #+BEGIN_SRC
-<b>  metric         days ago ▼ first        last         count</b>
+  metric         days ago ▼ first        last         count
   emacs-tracker  0          2019-11-23   2019-12-28   18
   beer           3          2012-02-13   2019-12-25   1349
   commute        64         2006-05-22   2019-10-25   1774
@@ -140,7 +140,7 @@
     drinking a beer:
 
 #+BEGIN_SRC
-<b>  year ▼       beer percent</b>
+  year ▼       beer percent
   2012         54.0
   2013         48.2
   2014         58.6
