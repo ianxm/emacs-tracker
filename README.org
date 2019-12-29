@@ -78,7 +78,7 @@
    metrics-tracker.el provides the following ways to view the metrics data in
    your diary.
 
-*** list
+*** list all metrics
 
 #+BEGIN_SRC
     M-x metrics-tracker-list
@@ -107,7 +107,7 @@
   commute        64         2006-05-22   2019-10-25   1774
 #+END_SRC
 
-*** table
+*** extract as a table
 
 #+BEGIN_SRC
     M-x metrics-tracker-table
@@ -151,7 +151,43 @@
   2019         30.4
 #+END_SRC
 
-*** graph
+*** show calendar view
+
+#+BEGIN_SRC
+    M-x metrics-tracker-cal
+#+END_SRC
+
+    emacs can extract the data for a metric and render it onto a
+    calendar.  the number at each calendar position is one of:
+    - period :: no metric for the day
+    - underscore :: before first metric occurrence or after current
+                    date
+    - number :: the value for the day
+
+    emacs will prompt for the following input parameters:
+    - metric-name :: the metric name
+    - value-transform :: how to transform the data. one of:
+      - total :: total for the day
+      - count :: count entries for the day
+
+    here's an example, showing hours of coding on this project
+
+#+BEGIN_SRC
+  emacs-tracker
+
+                    Dec 2019
+
+    Su    Mo    Tu    We    Th    Fr    Sa
+       .     .     .     .     .     .     .
+       3     .     6     .     4     2     .
+       .     4     2     2     .     .     .
+       1     1     .     1     .     .     4
+       .     _     _
+
+#+END_SRC
+
+
+*** draw graphs
 
     metrics-tracker.el can take the same table data and use it to generate a
     graph.  it uses gnuplot for graph generation, so gnuplot must be
@@ -211,10 +247,10 @@
 * todo
   - narrow mode in the output buffer
   - reports
-    - cal
     - streaks
     - bursts
     - records
   - report with multiple metrics as separate series
   - combine multiple metrics with formulas
   - sync to cloud
+  - quality checks

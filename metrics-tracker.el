@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.0.2
+;; Version: 0.0.3
 ;; Keywords: docs
 ;; Package-Requires: ((emacs "24.4") (seq "2.20"))
 
@@ -339,11 +339,12 @@ needed to determine the number of days in the current bin."
      ((eq value-transform 'per-month) (format "%.1f" (* value (/ 30 bin-duration))))
      ((eq value-transform 'per-year) (format "%.1f" (* value (/ 365 bin-duration)))))))
 
-(defun metrics-tracker--bin-metric-data (metric-name date-grouping value-transform today)
+(defun metrics-tracker--bin-metric-data (metric-name date-grouping value-transform today &optional allow-gaps-p)
   "Read the requested metric data from the diary.
 Only keep entries for METRIC-NAME.  Apply DATE-GROUPING and
 VALUE-TRANSFORM.  Fill gaps ending at TODAY.  Return the sorted
-bin data as (list (date . pretransformed-value))."
+bin data as (list (date . pretransformed-value)).  If
+ALLOW-GAPS-P is t, don't fill in gaps."
   (let* ((bin-data (make-hash-table :test 'equal))
          (first-date (nth 2 (nth 0 (seq-filter (lambda (item) (eq (car item) metric-name)) metrics-tracker-metric-index))))
          (first-date-bin (metrics-tracker--date-to-bin first-date date-grouping))
@@ -362,7 +363,8 @@ bin data as (list (date . pretransformed-value))."
     (metrics-tracker--process-diary table-filter-fcn table-action-fcn)
 
     ;; fill gaps
-    (unless (eq date-grouping 'full)
+    (unless (or (eq date-grouping 'full)
+                allow-gaps-p)
       (let ((current-date-bin first-date-bin))
         (while (time-less-p current-date-bin today-bin)
           (setq current-date-bin (metrics-tracker--date-to-next-bin current-date-bin date-grouping)) ; increment to next bin
@@ -452,6 +454,63 @@ bin data as (list (date . pretransformed-value))."
 
       (metrics-tracker--show-output-buffer))))
 
+;;;###autoload
+(defun metrics-tracker-cal ()
+  "Get a calendar view of the requested metric."
+  (interactive)
+
+  ;; make sure `metrics-tracker-metric-index' has been populated
+  (metrics-tracker--load-index)
+
+  (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
+         (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                                             (seq-take (parse-time-string (format-time-string "%F")) 6))))
+         ;; ask for params
+         (metric-name-str (completing-read "Metric: " all-metric-names nil t))
+         (metric-name (intern metric-name-str metrics-tracker-metric-names))
+         (value-transform (intern (completing-read "Value transform: " (metrics-tracker--value-transform-options 'day) nil t nil nil "total")))
+         ;; load metric data into bins
+         (sorted-bin-data (metrics-tracker--bin-metric-data metric-name 'day value-transform today t)))
+
+    (metrics-tracker--setup-output-buffer)
+    (fundamental-mode)
+
+    ;; render the calendars
+    (let* ((first (caar sorted-bin-data))
+           (first-decoded (decode-time first))
+           (month (nth 4 first-decoded))
+           (year (nth 5 first-decoded)))
+      (insert (format "  %s\n\n" metric-name-str))
+      (put-text-property (point-min) (point-max) 'face 'bold)
+      (while sorted-bin-data
+        (setq sorted-bin-data (metrics-tracker--print-month month year sorted-bin-data first today))
+        (insert "\n\n\n")
+        (setq month (1+ month))
+        (when (> month 12)
+          (setq month 1
+                year (1+ year)))))
+
+    (metrics-tracker--show-output-buffer)))
+
+(defun metrics-tracker--print-month (month year sorted-bin-data first today)
+  "Write metric data as a calendar for MONTH of YEAR.
+SORTED-BIN-DATA contains the data to render.  It ranges from FIRST
+until TODAY, which are time values."
+  (let ((first-day (encode-time 0 0 0 1 month year))
+        day)
+    (insert (format "                    %s\n\n" (format-time-string "%b %Y" first-day)))
+    (insert "    Su    Mo    Tu    We    Th    Fr    Sa\n  ")
+    (dotimes (_ii (nth 6 (decode-time first-day)))
+      (insert "      "))
+    (dotimes (daynum (metrics-tracker--days-of-month first-day))
+      (setq day (encode-time 0 0 0 (1+ daynum) month year))
+      (cond ((equal day (caar sorted-bin-data)) (insert (format "%6s" (cdr (pop sorted-bin-data)))))
+            ((time-less-p day first) (insert "     _")) ; before data
+            ((time-less-p today day) (insert "     _")) ; after today
+            (t (insert "     .")))                      ; gap in data
+      (when (= (nth 6 (decode-time day)) 6)
+          (insert "\n  "))))
+  sorted-bin-data)
 
 (defun metrics-tracker--make-gnuplot-config (metric-name
                                      date-grouping value-transform
