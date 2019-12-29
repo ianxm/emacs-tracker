@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.0.1
+;; Version: 0.0.2
 ;; Keywords: docs
 ;; Package-Requires: ((emacs "24.4") (seq "2.20"))
 
@@ -33,7 +33,6 @@
 (require 'seq)
 (require 'timezone)
 (require 'calendar)
-(require 'org-table)
 
 (defcustom metrics-tracker-graph-size '(700 . 500)
   "Specifies the size as (width . height) to be used for graph images."
@@ -168,6 +167,11 @@ sorted by 'last'."
       (setq metrics-tracker-metric-index (sort metrics-tracker-metric-index (lambda (a b) (> (nth 4 b) (nth 4 a)))))
       (add-hook 'kill-buffer-hook #'metrics-tracker-clear-data))))
 
+(defmacro metrics-tracker--num-sort (col)
+  "Sort string numbers in column COL of a tabulated list."
+  `(lambda (x y) (< (string-to-number (elt (nth 1 x) ,col))
+                   (string-to-number (elt (nth 1 y) ,col)))))
+
 ;;;###autoload
 (defun metrics-tracker-list ()
   "Display a list of all saved metrics in the output buffer.
@@ -177,19 +181,37 @@ This reads the diary file."
   (metrics-tracker--load-index)
 
   (metrics-tracker--setup-output-buffer)
+  (tabulated-list-mode)
 
-  (insert "| metric | days ago | first | last | count |\n") ; header
-  (insert "|--\n")
-  (dolist (metric metrics-tracker-metric-index)
-    (insert (format "| %s | %s | %s | %s | %s |\n"      ; data
-                    (nth 0 metric)
-                    (nth 4 metric)
-                    (format-time-string "%F" (nth 2 metric))
-                    (format-time-string "%F" (nth 3 metric))
-                    (nth 1 metric))))
-  (goto-char (point-min))
-  (orgtbl-mode t)
-  (org-ctrl-c-ctrl-c)
+  ;; set headers
+  (let ((metric-name-width (seq-reduce (lambda (width ii) (max width (length ii)))
+                                      (mapcar (lambda (ii) (symbol-name (nth 0 ii))) metrics-tracker-metric-index)
+                                      10)))
+    (setq-local tabulated-list-format (vector (list "metric" metric-name-width t)
+                                              (list "days ago" 10 (metrics-tracker--num-sort 1))
+                                              (list "first" 12 t)
+                                              (list "last" 12 t)
+                                              (list "count" 8 (metrics-tracker--num-sort 4)))))
+  ;; configure
+  (setq-local tabulated-list-padding 2)
+  (setq-local tabulated-list-sort-key (cons "days ago" nil))
+
+  ;; set data
+  (let (data)
+    (dolist (metric metrics-tracker-metric-index)
+      (setq data (cons (list (symbol-name (nth 0 metric))
+                             (vector (symbol-name (nth 0 metric))
+                                     (number-to-string (nth 4 metric))
+                                     (format-time-string "%F" (nth 2 metric))
+                                     (format-time-string "%F" (nth 3 metric))
+                                     (number-to-string (nth 1 metric))))
+                       data)))
+    (setq-local tabulated-list-entries data))
+
+  ;; render the table
+  (tabulated-list-init-header)
+  (tabulated-list-print nil nil)
+
   (metrics-tracker--show-output-buffer))
 
 (defvar metrics-tracker-grouping-and-transform-options
@@ -388,8 +410,10 @@ bin data as (list (date . pretransformed-value))."
          (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                              (seq-take (parse-time-string (format-time-string "%F")) 6))))
          ;; ask for params
-         (metric-name (intern (completing-read "Metric: " all-metric-names nil t) metrics-tracker-metric-names))
-         (date-grouping (intern (completing-read "Group dates by: " (metrics-tracker--date-grouping-options) nil t nil nil "month")))
+         (metric-name-str (completing-read "Metric: " all-metric-names nil t))
+         (metric-name (intern metric-name-str metrics-tracker-metric-names))
+         (date-grouping-str (completing-read "Group dates by: " (metrics-tracker--date-grouping-options) nil t nil nil "month"))
+         (date-grouping (intern date-grouping-str))
          (value-transform (intern (completing-read "Value transform: " (metrics-tracker--value-transform-options date-grouping) nil t nil nil "total")))
          ;; load metric data into bins
          (sorted-bin-data (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today)))
@@ -402,20 +426,29 @@ bin data as (list (date . pretransformed-value))."
                  (cdar sorted-bin-data))
 
       (metrics-tracker--setup-output-buffer)
+      (tabulated-list-mode)
 
-      (set-buffer metrics-tracker-output-buffer-name)
-      (insert (format "| %s | %s %s |\n" ; header
-                      date-grouping
-                      metric-name
-                      (replace-regexp-in-string "-" " " (symbol-name value-transform))))
-      (insert "|--\n")
-      (dolist (bin sorted-bin-data)
-        (insert (format "| %s | %s |\n"  ; data
-                        (format-time-string (metrics-tracker--format-bin date-grouping) (car bin))
-                        (cdr bin))))
-      (goto-char (point-min))
-      (orgtbl-mode t)
-      (org-ctrl-c-ctrl-c)
+      ;; set headers
+      (setq tabulated-list-format (vector (list date-grouping-str 12 t)
+                                          (list (format "%s %s" metric-name-str
+                                                        (replace-regexp-in-string "-" " " (symbol-name value-transform)))
+                                                10
+                                                (metrics-tracker--num-sort 1))))
+      ;; configure
+      (setq tabulated-list-padding 2)
+      (setq tabulated-list-sort-key (cons date-grouping-str nil))
+
+      ;; set data
+      (let (data date-str)
+        (dolist (bin sorted-bin-data)
+          (setq date-str (format-time-string (metrics-tracker--format-bin date-grouping) (car bin))
+                data (cons (list date-str (vector date-str (cdr bin)))
+                           data))
+          (setq-local tabulated-list-entries data)))
+
+      ;; render the table
+      (tabulated-list-init-header)
+      (tabulated-list-print nil nil)
 
       (metrics-tracker--show-output-buffer))))
 
@@ -503,7 +536,8 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
                                     sorted-bin-data
                                     graph-type graph-output fname)
       (save-current-buffer
-        (metrics-tracker--setup-output-buffer))
+        (metrics-tracker--setup-output-buffer)
+        (fundamental-mode))
 
       (unless (null fname)
         (setq metrics-tracker-tempfiles (cons fname metrics-tracker-tempfiles)) ; keep track of it so we can delete it

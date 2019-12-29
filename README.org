@@ -85,8 +85,13 @@
 #+END_SRC
 
     this creates a table containing all of the metrics found in your
-    emacs diary.  metrics-tracker write out a table containing the following
-    columns:
+    emacs diary.
+
+    the table can be sorted by any column by moving over the column
+    and hitting `S`.  the arrow in the header indicates the sort
+    column and direction.
+
+    the table contains the following columns:
     - metric :: the metric name
     - days ago :: the number of days since "last"
     - first :: the date of the first entry
@@ -96,11 +101,10 @@
     here's an example:
 
 #+BEGIN_SRC org-mode
-| metric         | count |      first |       last | days ago |
-|----------------+-------+------------+------------+----------|
-| emacs-tracker  |    17 | 2019-11-23 | 2019-12-25 |        0 |
-| beer           |  1348 | 2012-02-13 | 2019-12-24 |        1 |
-| commute        |  1774 | 2006-05-22 | 2019-10-25 |       61 |
+  metric         days ago ▼ first        last         count
+  emacs-tracker  0          2019-11-23   2019-12-28   18
+  beer           3          2012-02-13   2019-12-25   1349
+  commute        64         2006-05-22   2019-10-25   1774
 #+END_SRC
 
 *** table
@@ -128,20 +132,23 @@
     this creates a table containing the transformed data for the
     requested metric.
 
+    the table can be sorted by either column by moving over the column
+    and hitting `S`.  the arrow in the header indicates the sort
+    column and direction.
+
     here's an example, showing the percentage of days of each year
     drinking a beer:
 
 #+BEGIN_SRC org-mode
-| year | beer percent |
-|------+--------------|
-| 2012 |         54.0 |
-| 2013 |         48.2 |
-| 2014 |         58.6 |
-| 2015 |         59.5 |
-| 2016 |         50.7 |
-| 2017 |         39.5 |
-| 2018 |         35.3 |
-| 2019 |         30.3 |
+  year ▼       beer percent
+  2012         54.0
+  2013         48.2
+  2014         58.6
+  2015         59.5
+  2016         50.7
+  2017         39.5
+  2018         35.3
+  2019         30.4
 #+END_SRC
 
 *** graph
