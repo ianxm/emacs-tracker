@@ -88,7 +88,7 @@
     emacs diary.
 
     the table can be sorted by any column by moving over the column
-    and hitting `S`.  the arrow in the header indicates the sort
+    and hitting ~S~.  the arrow in the header indicates the sort
     column and direction.
 
     the table contains the following columns:
@@ -100,8 +100,8 @@
 
     here's an example:
 
-#+BEGIN_SRC org-mode
-  metric         days ago ▼ first        last         count
+#+BEGIN_SRC
+<b>  metric         days ago ▼ first        last         count</b>
   emacs-tracker  0          2019-11-23   2019-12-28   18
   beer           3          2012-02-13   2019-12-25   1349
   commute        64         2006-05-22   2019-10-25   1774
@@ -133,14 +133,14 @@
     requested metric.
 
     the table can be sorted by either column by moving over the column
-    and hitting `S`.  the arrow in the header indicates the sort
+    and hitting ~S~.  the arrow in the header indicates the sort
     column and direction.
 
     here's an example, showing the percentage of days of each year
     drinking a beer:
 
-#+BEGIN_SRC org-mode
-  year ▼       beer percent
+#+BEGIN_SRC
+<b>  year ▼       beer percent</b>
   2012         54.0
   2013         48.2
   2014         58.6
