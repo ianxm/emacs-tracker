@@ -332,7 +332,7 @@ needed to determine the number of days in the current bin."
                                                            (time-to-days first-date)))))))
     (cond
      ((eq value-transform 'total) (format "%g" value))
-     ((eq value-transform 'count) value)
+     ((eq value-transform 'count) (format "%d" value))
      ((eq value-transform 'percent) (format "%.1f" (* (/ value bin-duration) 100)))
      ((eq value-transform 'per-day) (format "%.1f" (* value (/ 1 bin-duration))))
      ((eq value-transform 'per-week) (format "%.1f" (* value (/ 7 bin-duration))))
@@ -447,6 +447,7 @@ ALLOW-GAPS-P is t, don't fill in gaps."
                 data (cons (list date-str (vector date-str (cdr bin)))
                            data))
           (setq-local tabulated-list-entries data)))
+      (message "entries %s" tabulated-list-entries)
 
       ;; render the table
       (tabulated-list-init-header)
@@ -536,8 +537,9 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
            (insert (format "set title \"%s\"\n" metric-name))
            (insert (format "set output \"%s\"\n" fname))))
     (insert (format "set xlabel \"%s\"\n" date-grouping))
-    (insert (format "set timefmt \"%s\"\n" date-format))
-    (insert (format "set format x \"%s\"\n" date-format))
+    (when date-format ; not 'full
+      (insert (format "set timefmt \"%s\"\n" date-format))
+      (insert (format "set format x \"%s\"\n" date-format)))
     (insert (format "set ylabel \"%s\"\n" value-transform))
     (cond ((eq graph-type 'line)
            (insert "set xdata time\n")
@@ -557,11 +559,13 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
            (insert "set xtics rotate\n")
            (insert "set style line 1 pt 7 ps 0.5\n")
            (insert "plot \"-\" using 1:2 with points notitle ls 1 lc rgbcolor \"#399320\"\n")))
-    (insert (mapconcat (lambda (x) (format "%s %s"
-                                           (format-time-string date-format (car x))
-                                           (cdr x)))
-                       sorted-bin-data
-                       "\n"))
+    (if (not date-format)
+        (insert (format ". %s\n" (cdar sorted-bin-data)))
+      (insert (mapconcat (lambda (x) (format "%s %s"
+                                             (format-time-string date-format (car x))
+                                             (cdr x)))
+                         sorted-bin-data
+                         "\n")))
     (insert "\ne")))
 
 ;;;###autoload
