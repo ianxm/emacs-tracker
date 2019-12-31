@@ -392,14 +392,12 @@ ALLOW-GAPS-P is t, don't fill in gaps."
   "Create and clear the output buffer."
   (let ((buffer (get-buffer-create metrics-tracker-output-buffer-name)))
     (set-buffer buffer)
-    (read-only-mode -1)
-    (erase-buffer)))
+    (let ((inhibit-read-only t))
+      (erase-buffer))))
 
 (defun metrics-tracker--show-output-buffer ()
   "Show the output buffer."
   (let ((buffer (get-buffer metrics-tracker-output-buffer-name)))
-    (set-buffer buffer)
-    (read-only-mode 1)
     (set-window-buffer (selected-window) buffer)))
 
 (defun metrics-tracker--check-gnuplot-exists ()
@@ -454,11 +452,11 @@ ALLOW-GAPS-P is t, don't fill in gaps."
                 data (cons (list date-str (vector date-str (cdr bin)))
                            data))
           (setq-local tabulated-list-entries data)))
-      (message "entries %s" tabulated-list-entries)
 
       ;; render the table
-      (tabulated-list-init-header)
-      (tabulated-list-print nil nil)
+      (let ((inhibit-read-only t))
+        (tabulated-list-init-header)
+        (tabulated-list-print nil nil))
 
       (metrics-tracker--show-output-buffer))))
 
@@ -484,7 +482,8 @@ ALLOW-GAPS-P is t, don't fill in gaps."
     (fundamental-mode)
 
     ;; render the calendars
-    (let* ((first (caar sorted-bin-data))
+    (let* ((inhibit-read-only t)
+           (first (caar sorted-bin-data))
            (first-decoded (decode-time first))
            (month (nth 4 first-decoded))
            (year (nth 5 first-decoded)))
@@ -612,15 +611,17 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
       (unless (null fname)
         (setq metrics-tracker-tempfiles (cons fname metrics-tracker-tempfiles)) ; keep track of it so we can delete it
         (add-hook 'kill-emacs-hook #'metrics-tracker-remove-tempfiles))
-      (call-process-region (point-min) (point-max) "gnuplot" nil buffer)
-      (set-buffer buffer)
-      (goto-char (point-min))
-      (if (eq graph-output 'ascii)
-          (while (re-search-forward "\f" nil t) ; delete the formfeed in gnuplot output
-            (replace-match ""))
-        (insert-image (create-image fname) "graph") ; insert the tempfile into the output buffer
-        (insert "\n")
-        (goto-char (point-min)))
+
+      (let ((inhibit-read-only t))
+        (call-process-region (point-min) (point-max) "gnuplot" nil buffer)
+        (set-buffer buffer)
+        (goto-char (point-min))
+        (if (eq graph-output 'ascii)
+            (while (re-search-forward "\f" nil t) ; delete the formfeed in gnuplot output
+              (replace-match ""))
+          (insert-image (create-image fname) "graph") ; insert the tempfile into the output buffer
+          (insert "\n")
+          (goto-char (point-min))))
 
       (metrics-tracker--show-output-buffer))))
 
