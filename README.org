@@ -33,7 +33,7 @@
    metrics-tracker.el uses must look like:
 
 #+BEGIN_SRC
-   [date] [metric-name] [value]
+   [date] [time] [metric-name] [value]
 #+END_SRC
 
    where,
@@ -41,16 +41,28 @@
              allows dates like "wednesday," which applies to all
              wednesdays, metrics-tracker.el only uses dates for specific days.
              examples of valid dates are:
-             - ~2020-01-01~
-             - ~1 Jan 2020~
-             - ~Jan 1, 2020~
+     - ~2020-01-01~
+     - ~1 Jan 2020~
+     - ~Jan 1, 2020~
+   - time :: the time of day is optional and ignored by
+             metrics-tracker.el if it is provided.  if provided, it
+             must be formatted as:
+     - ~10:30~
+     - ~10:30a~
+     - ~10:30am~
+     - ~10:30 am~
    - metric-name :: is any string.  it can be as long as you like and
                     can include spaces but keeping them short helps
-                    with readability.
-   - value :: is a number (integer or decimal).  metrics-tracker.el doesn't
-              care about units.  ~value~ is just a number.  if you're
-              tracking how much tv you watch, a "4" could mean 4 shows
-              or 4 hours; it's up to you.
+                    with readability.  valid values may look like:
+     - ~pushups~
+     - ~watched tv~
+   - value :: is a number (integer or decimal).  metrics-tracker.el
+              doesn't care about units.  ~value~ is just a number.  if
+              you're tracking how much tv you watch, a "4" could mean
+              4 shows or 4 hours; it's up to you.  do not include
+              commas. valid values may be:
+     - ~40~
+     - ~1.2~
 
 *** whitelist / blacklist
 
@@ -185,7 +197,6 @@
        .     _     _
 
 #+END_SRC
-
 
 *** draw graphs
 
