@@ -81,12 +81,19 @@ the diary file to be re-read if the data is needed again.")
   `(if (time-less-p ,d1 ,d2) ,d2 ,d1))
 
 (defun metrics-tracker--process-diary (filter action)
-  "Read the diary file.
+  "Parse the diary file.
 For each valid metrics entry found, parse the fields and then
-apply the given FILTER and ACTION."
-  (let ((valid-formats '("^\\([[:digit:]\-]+\\) \\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$"                           ; YYYY-MM-DD
-                         "^\\([[:alpha:]]+ [[:digit:]]+, [[:digit:]]+\\) \\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$"  ; MMM DD, YYYY
-                         "^\\([[:digit:]]+ [[:alpha:]]+ [[:digit:]]+\\) \\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$")) ; DD MMM YYYY
+apply the given FILTER and ACTION.
+
+Valid metrics entries look like \"DATE TIME METRICNAME VALUE\" where
+- DATE looks like \"2020-01-01\" or \"Jan 1, 2020\" or \"1 Jan 2020\"
+- TIME (which we ignore) looks like \"10:30\" or \"10:30a\" or \"10:30 am\"
+- METRICNAME is any string, whitespace included
+- VALUE is a decimal number like \"1\" or \"1.2\""
+
+  (let ((valid-formats '("\\([[:digit:]\-]+\\) *\\(?:[[:digit:]\:]+ ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$"                            ; YYYY-MM-DD
+                         "^\\([[:alpha:]]+ [[:digit:]]+, [[:digit:]]+\\) *\\(?:[[:digit:]\:]+ ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$"  ; MMM DD, YYYY
+                         "^\\([[:digit:]]+ [[:alpha:]]+ [[:digit:]]+\\) *\\(?:[[:digit:]\:]+ ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$")) ; DD MMM YYYY
         metric-name metric-date metric-value foundp)
     (with-temp-buffer
       (insert-file-contents diary-file)
@@ -123,10 +130,10 @@ needed.  Also delete the tempfiles (graph images) listed in
 
 (defun metrics-tracker--load-index ()
   "Make sure the metric index has been populated.
-This reads the diary file and fills in `metrics-tracker-metric-list' if
-it is nil.
+This reads the diary file and populated in
+`metrics-tracker-metric-list' if it is nil.
 
-`metrics-tracker-metric-list' is a list of (metric-name count first last)
+`metrics-tracker-metric-list' is a list of (metric-name count first last daysago)
 sorted by 'last'."
   (unless metrics-tracker-metric-index
     (let* (metrics ; will contain plist of metric-name -> (metric-name count first last since)
