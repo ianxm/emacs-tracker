@@ -6,7 +6,7 @@
 ;; URL: https://github.com/ianxm/emacs-tracker
 ;; Version: 0.0.3
 ;; Keywords: docs
-;; Package-Requires: ((emacs "24.4") (seq "2.20"))
+;; Package-Requires: ((emacs "24.4") seq)
 
 ;; This file is not part of GNU Emacs.
 
