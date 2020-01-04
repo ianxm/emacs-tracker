@@ -1,6 +1,6 @@
 ;;; metrics-tracker.el --- Generate diagrams of personal metrics from diary entries  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2019 Ian Martins
+;; Copyright (C) 2019-2020 Ian Martins
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
