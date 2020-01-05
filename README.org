@@ -21,48 +21,68 @@
 ** entering metrics data
 
    metrics entries are regular diary entries so they can be created by
-   updating the diary in the normal way, but diary entries that aren't
-   in a certain format will be ignored by metrics-tracker.
+   updating the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Diary.html][emacs diary]] in the normal way, but diary entries that
+   aren't in a certain format will be ignored by metrics-tracker.
+   metric-tracker reads diary entries from the file pointed to by the
+   ~diary-file~ variable.
 
    tip: consider using abbrev mode in diary mode and setting
    abbreviations for your metrics to save yourself a few keystrokes.
 
 *** diary entry format
 
-   emacs is very loose on diary entry formatting, but entries that
-   metrics-tracker.el uses must look like:
+    emacs is very loose on [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Format-of-Diary-File.html#Format-of-Diary-File][diary entry formatting]], but entries that
+    metrics-tracker.el uses must look like:
 
 #+BEGIN_SRC
-   [date] [time] [metric-name] [value]
+    [date] [time] [metric-name] [value]
 #+END_SRC
 
-   where,
-   - date :: the date of a particular day.  although the emacs diary
+    where,
+    - date :: the date of a particular day.  although the emacs diary
              allows dates like "wednesday," which applies to all
              wednesdays, metrics-tracker.el only uses dates for specific days.
-             examples of valid dates are:
-     - ~2020-01-01~
-     - ~1 Jan 2020~
-     - ~Jan 1, 2020~
-   - time :: the time of day is optional and ignored by
+             some examples of valid dates are:
+      - ~2019-12-31~
+      - ~31 Dec 2019~
+      - ~December 31, 2019~
+      - ~31/Dec/2019~
+    - time :: the time of day is optional and ignored by
              metrics-tracker.el if it is provided.  if provided, it
              must be formatted as:
-     - ~10:30~
-     - ~10:30a~
-     - ~10:30am~
-     - ~10:30 am~
-   - metric-name :: is any string.  it can be as long as you like and
-                    can include spaces but keeping them short helps
-                    with readability.  valid values may look like:
-     - ~pushups~
-     - ~watched tv~
-   - value :: is a number (integer or decimal).  metrics-tracker.el
-              doesn't care about units.  ~value~ is just a number.  if
-              you're tracking how much tv you watch, a "4" could mean
-              4 shows or 4 hours; it's up to you.  do not include
-              commas. valid values may be:
-     - ~40~
-     - ~1.2~
+      - ~10:30~
+      - ~10:30a~
+      - ~10:30 a~
+      - ~10:30:10 am~
+    - metric-name :: is any string.  it can be as long as you like and
+                     can include spaces but keeping them short helps
+                     with readability.  valid values may look like:
+      - ~pushups~
+      - ~watched tv~
+    - value :: is a number (integer or decimal).  metrics-tracker.el
+               doesn't care about units.  ~value~ is just a number.  if
+               you're tracking how much tv you watch, a "4" could mean
+               4 shows or 4 hours; it's up to you.  do not include
+               commas. valid values may be:
+      - ~40~
+      - ~1.2~
+
+    here is an example diary file where all entries are valid metrics.
+    there's no advantage to mixing date formats.  the example does it
+    for demonstration purposes.
+
+#+BEGIN_SRC
+2019-12-29 beer 1
+2019-12-31 coding emacs-tracker 1
+2019-12-31 wine 2
+2020-01-02 bike commute 11
+January 1, 2020 7:10 pm beer 1
+04/Jan/2020 coding emacs-scrum 2
+4 Jan 2020 coding emacs-scrum 2
+Jan 4, 2020 run time 18
+Jan 4, 2020 run dist 2
+04/Jan/2020 10:00pm beer 1
+#+end_SRC
 
 *** whitelist / blacklist
 
@@ -75,7 +95,7 @@
     as:
 
 #+BEGIN_SRC
-   '("pushups" "situps")
+   '("run time" "run dist")
 #+end_SRC
 
     if metrics-tracker.el picks up lots of metrics that you don't want to see,
@@ -250,7 +270,7 @@
     for each week and renders it as a scatter plot written as a png
     image.
 
-    [[./doc/commute_by_week.png]]
+    [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/commute_by_week.png]]
 
     the dimensions of the image can be set by modifying the variable
     `metrics-tracker-graph-size`.
