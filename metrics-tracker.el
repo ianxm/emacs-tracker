@@ -4,9 +4,9 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.0.3
+;; Version: 0.0.4
 ;; Keywords: docs
-;; Package-Requires: ((emacs "24.4") seq)
+;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -91,23 +91,27 @@ Valid metrics entries look like \"DATE TIME METRICNAME VALUE\" where
 - METRICNAME is any string, whitespace included
 - VALUE is a decimal number like \"1\" or \"1.2\""
 
-  (let ((valid-formats '("^\\([[:digit:]\-]+\\) *\\(?:[[:digit:]\:]+ ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$"                            ; YYYY-MM-DD
+  (let ((valid-formats '("^\\([[:digit:]]\\{4\\}\-[[:digit:]]\\{2\\}\-[[:digit:]]\\{2\\}\\) *\\(?:[[:digit:]\:]+ ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$"     ; YYYY-MM-DD
+                         "^\\([[:digit:]]\\{2\\}\/[[:alpha:]]+\/[[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]+ ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$"           ; DD/MMM/YYYY
                          "^\\([[:alpha:]]+ [[:digit:]]\\{1,2\\}, [[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]\\{1,8\\} ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$"  ; MMM DD, YYYY
                          "^\\([[:digit:]]\\{1,2\\} [[:alpha:]]+ [[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]\\{1,8\\} ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$")) ; DD MMM YYYY
         metric-name metric-date metric-value foundp)
     (with-temp-buffer
       (insert-file-contents diary-file)
       (dolist (line (split-string (buffer-string) "\n" t))
-        (setq foundp nil)
-        (dolist (format valid-formats)
-          (if (string-match format line)
-              (setq metric-date (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
-                                                             (seq-take (parse-time-string (match-string 1 line)) 6)))
-                    metric-name (intern (match-string 2 line) metrics-tracker-metric-names)
-                    metric-value (string-to-number (match-string 3 line))
-                    foundp t)))
-        (if (and foundp (funcall filter metric-date metric-name))
-            (funcall action metric-date metric-name metric-value))))))
+        (condition-case nil
+            (progn
+              (setq foundp nil)
+              (dolist (format valid-formats)
+                (if (string-match format line)
+                    (setq metric-date (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                                                                   (seq-take (parse-time-string (match-string 1 line)) 6)))
+                          metric-name (intern (match-string 2 line) metrics-tracker-metric-names)
+                          metric-value (string-to-number (match-string 3 line))
+                          foundp t)))
+              (if (and foundp (funcall filter metric-date metric-name))
+                  (funcall action metric-date metric-name metric-value)))
+            (error (message "error parsing line: %s" line)))))))
 
 (defun metrics-tracker-clear-data ()
   "Clear cached data and delete tempfiles.
