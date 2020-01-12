@@ -156,6 +156,7 @@ Jan 4, 2020 run dist 2
     - value-transform :: how to transform the data. one of:
       - total :: sum all of the values in the bin
       - count :: count entries in the bin
+      - percent :: percent of days within the ~date-grouping~ with an occurrence
       - per-day :: divide the bin total by the number of days in the bin
       - per-week :: divide the bin total by the number of weeks in the bin
       - per-month :: divide the bin total by the number of months in the bin

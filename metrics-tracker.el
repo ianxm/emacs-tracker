@@ -137,10 +137,10 @@ needed.  Also delete the tempfiles (graph images) listed in
 This reads the diary file and populated in
 `metrics-tracker-metric-list' if it is nil.
 
-`metrics-tracker-metric-list' is a list of (metric-name count first last daysago)
-sorted by 'last'."
+`metrics-tracker-metric-list' is a list of
+\(metric-name count first last daysago) sorted by 'last'."
   (unless metrics-tracker-metric-index
-    (let* (metrics ; will contain plist of metric-name -> (metric-name count first last since)
+    (let* (metrics ; will contain plist of metric-name -> (metric-name count first last daysago)
            existing-metric
            (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                                (seq-take (parse-time-string (format-time-string "%F")) 6))))
@@ -409,6 +409,18 @@ ALLOW-GAPS-P is t, don't fill in gaps."
   (unless (eq 0 (call-process-shell-command "gnuplot --version"))
     (error "Cannot find gnuplot")))
 
+(defun metrics-tracker--presorted-options (options)
+  "Prevent Emacs from sorting OPTIONS.
+For some reason some versions of Emacs sort the given options instead of just
+presenting them.  Solution taken from:
+https://emacs.stackexchange.com/questions/41801/how-to-stop-completing-read-ivy-completing-read-from-sorting"
+  (lambda (string pred action)
+    (if (eq action 'metadata)
+        '(metadata (display-sort-function . identity)
+                   (cycle-sort-function . identity))
+      (complete-with-action
+       action options string pred))))
+
 ;;;###autoload
 (defun metrics-tracker-table ()
   "Get a tabular view of the requested metric."
@@ -417,15 +429,20 @@ ALLOW-GAPS-P is t, don't fill in gaps."
   ;; make sure `metrics-tracker-metric-index' has been populated
   (metrics-tracker--load-index)
 
-  (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
+  (let* ((ivy-sort-functions-alist nil)
+         (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
          (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                              (seq-take (parse-time-string (format-time-string "%F")) 6))))
          ;; ask for params
-         (metric-name-str (completing-read "Metric: " all-metric-names nil t))
+         (metric-name-str (completing-read "Metric: " (metrics-tracker--presorted-options all-metric-names) nil t))
          (metric-name (intern metric-name-str metrics-tracker-metric-names))
-         (date-grouping-str (completing-read "Group dates by: " (metrics-tracker--date-grouping-options) nil t nil nil "month"))
+         (date-grouping-str (completing-read "Group dates by: " (metrics-tracker--presorted-options
+                                                                 (metrics-tracker--date-grouping-options))
+                                             nil t nil nil "month"))
          (date-grouping (intern date-grouping-str))
-         (value-transform (intern (completing-read "Value transform: " (metrics-tracker--value-transform-options date-grouping) nil t nil nil "total")))
+         (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
+                                                                        (metrics-tracker--value-transform-options date-grouping))
+                                                   nil t nil nil "total")))
          ;; load metric data into bins
          (sorted-bin-data (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today)))
 
@@ -472,13 +489,16 @@ ALLOW-GAPS-P is t, don't fill in gaps."
   ;; make sure `metrics-tracker-metric-index' has been populated
   (metrics-tracker--load-index)
 
-  (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
+  (let* ((ivy-sort-functions-alist nil)
+         (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
          (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                              (seq-take (parse-time-string (format-time-string "%F")) 6))))
          ;; ask for params
-         (metric-name-str (completing-read "Metric: " all-metric-names nil t))
+         (metric-name-str (completing-read "Metric: " (metrics-tracker--presorted-options all-metric-names) nil t))
          (metric-name (intern metric-name-str metrics-tracker-metric-names))
-         (value-transform (intern (completing-read "Value transform: " (metrics-tracker--value-transform-options 'day) nil t nil nil "total")))
+         (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
+                                                                        (metrics-tracker--value-transform-options 'day))
+                                                   nil t nil nil "total")))
          ;; load metric data into bins
          (sorted-bin-data (metrics-tracker--bin-metric-data metric-name 'day value-transform today t)))
 
@@ -588,15 +608,22 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
   ;; make sure `metrics-tracker-metric-index' has been populated
   (metrics-tracker--load-index)
 
-  (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
+  (let* ((ivy-sort-functions-alist nil)
+         (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
          (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                              (seq-take (parse-time-string (format-time-string "%F")) 6))))
          ;; ask for params
-         (metric-name (intern (completing-read "Metric: " all-metric-names nil t) metrics-tracker-metric-names))
-         (date-grouping (intern (completing-read "Group dates by: " (metrics-tracker--date-grouping-options) nil t nil nil "month")))
-         (value-transform (intern (completing-read "Value transform: " (metrics-tracker--value-transform-options date-grouping) nil t nil nil "total")))
-         (graph-type (intern (completing-read "Graph type: " metrics-tracker-graph-options nil t nil nil "line")))
-         (graph-output (intern (completing-read "Graph output: " metrics-tracker-graph-output-options nil t nil nil "ascii")))
+         (metric-name (intern (completing-read "Metric: " (metrics-tracker--presorted-options all-metric-names) nil t) metrics-tracker-metric-names))
+         (date-grouping (intern (completing-read "Group dates by: " (metrics-tracker--presorted-options
+                                                                     (metrics-tracker--date-grouping-options)) nil t nil nil "month")))
+         (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
+                                                                        (metrics-tracker--value-transform-options date-grouping))
+                                                   nil t nil nil "total")))
+         (graph-type (intern (completing-read "Graph type: " (metrics-tracker--presorted-options metrics-tracker-graph-options)
+                                              nil t nil nil "line")))
+         (graph-output (intern (completing-read "Graph output: " (metrics-tracker--presorted-options
+                                                                  metrics-tracker-graph-output-options)
+                                                nil t nil nil "ascii")))
          ;; load metric data into bins
          (sorted-bin-data (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today))
          ;; prep output buffer
