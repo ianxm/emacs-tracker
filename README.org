@@ -1,4 +1,4 @@
-[[https://melpa.org/#/metrics-tracker][file:https://melpa.org/packages/metrics-tracker-badge.svg]] [[https://img.shields.io/badge/license-GPL_3-green.svg][file:https://www.gnu.org/licenses/gpl-3.0.txt]]
+[[https://melpa.org/#/metrics-tracker][file:https://melpa.org/packages/metrics-tracker-badge.svg]] [[https://www.gnu.org/licenses/gpl-3.0.txt][file:https://img.shields.io/badge/license-GPL_3-green.svg]]
 
 * metrics-tracker.el
 ** overview
