@@ -1,35 +1,44 @@
-* overview
+[[https://melpa.org/#/metrics-tracker][file:https://melpa.org/packages/metrics-tracker-badge.svg]] [[https://img.shields.io/:license-gpl3-blue.svg][file:https://www.gnu.org/licenses/gpl-3.0.html]]
 
-  [[http://www.gnu.org/software/emacs/][emacs]] is a text editor.  an extensible one.  it is mainly used for
-  coding, but it can also do anything else.  emacs includes a diary
-  which you can use to keep track of which things you do on which
-  days.
+* metrics-tracker.el
+** overview
 
-  [[https://github.com/ianxm/emacs-tracker][metrics-tracker.el]] gives emacs the capability to generate tables and charts
-  from the personal metrics data found in your diary entries.
+   [[http://www.gnu.org/software/emacs/][emacs]] is a text editor.  an extensible one.  it is mainly used for
+   coding, but it can also do anything else.  emacs includes a diary
+   which you can use to keep track of which things you do on which
+   days.
 
-  using metrics-tracker.el, you can use your emacs diary to track daily
-  personal metrics.  each metric is a count of something per day.  the
-  point is to measure behaviors that you are trying to increase (like
-  exercise) or decrease (like watching buffy the vampire slayer) so
-  that you can see if you are making progress toward that goal.
+   [[https://github.com/ianxm/emacs-tracker][metrics-tracker.el]] gives emacs the capability to generate tables and charts
+   from the personal metrics data found in your diary entries.
 
-  this is a port of [[https://github.com/ianxm/tracker][tracker]].
+   using metrics-tracker.el, you can use your emacs diary to track daily
+   personal metrics.  each metric is a count of something per day.  the
+   point is to measure behaviors that you are trying to increase (like
+   exercise) or decrease (like watching buffy the vampire slayer) so
+   that you can see if you are making progress toward that goal.
 
-* usage
+   this is a port of [[https://github.com/ianxm/tracker][tracker]].
 
-** entering metrics data
+** installation
 
-   metrics entries are regular diary entries so they can be created by
-   updating the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Diary.html][emacs diary]] in the normal way, but diary entries that
-   aren't in a certain format will be ignored by metrics-tracker.
-   metric-tracker reads diary entries from the file pointed to by the
-   ~diary-file~ variable.
+   metrics-tracker.el is available via ELPA, from the MELPA
+   repository.  it can be installed with ~M-x package-install RET
+   metrics-tracker RET~.
 
-   tip: consider using abbrev mode in diary mode and setting
-   abbreviations for your metrics to save yourself a few keystrokes.
+** usage
 
-*** diary entry format
+*** entering metrics data
+
+    metrics entries are regular diary entries so they can be created by
+    updating the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Diary.html][emacs diary]] in the normal way, but diary entries that
+    aren't in a certain format will be ignored by metrics-tracker.
+    metric-tracker reads diary entries from the file pointed to by the
+    ~diary-file~ variable.
+
+    tip: consider using abbrev mode in diary mode and setting
+    abbreviations for your metrics to save yourself a few keystrokes.
+
+**** diary entry format
 
     emacs is very loose on [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Format-of-Diary-File.html#Format-of-Diary-File][diary entry formatting]], but entries that
     metrics-tracker.el uses must look like:
@@ -84,7 +93,7 @@ Jan 4, 2020 run dist 2
 04/Jan/2020 10:00pm beer 1
 #+end_SRC
 
-*** whitelist / blacklist
+**** whitelist / blacklist
 
     by default metrics-tracker.el will pick up any diary entries that match
     the format it is looking for, which means it might pick up entries
@@ -105,12 +114,12 @@ Jan 4, 2020 run dist 2
     specify a whitelist, only those are considered and the blacklist
     is ignored.
 
-** reporting
+*** reporting
 
-   metrics-tracker.el provides the following ways to view the metrics data in
-   your diary.
+    metrics-tracker.el provides the following ways to view the metrics data in
+    your diary.
 
-*** list all metrics
+**** list all metrics
 
 #+BEGIN_SRC
     M-x metrics-tracker-list
@@ -139,7 +148,7 @@ Jan 4, 2020 run dist 2
   commute        64         2006-05-22   2019-10-25   1774
 #+END_SRC
 
-*** extract as a table
+**** extract as a table
 
 #+BEGIN_SRC
     M-x metrics-tracker-table
@@ -184,7 +193,7 @@ Jan 4, 2020 run dist 2
   2019         30.4
 #+END_SRC
 
-*** show calendar view
+**** show calendar view
 
 #+BEGIN_SRC
     M-x metrics-tracker-cal
@@ -219,7 +228,7 @@ Jan 4, 2020 run dist 2
 
 #+END_SRC
 
-*** draw graphs
+**** draw graphs
 
     metrics-tracker.el can take the same table data and use it to generate a
     graph.  it uses gnuplot for graph generation, so gnuplot must be
@@ -276,13 +285,13 @@ Jan 4, 2020 run dist 2
     the dimensions of the image can be set by modifying the variable
     `metrics-tracker-graph-size`.
 
-* todo
-  - narrow mode in the output buffer
-  - reports
-    - streaks
-    - bursts
-    - records
-  - report with multiple metrics as separate series
-  - combine multiple metrics with formulas
-  - sync to cloud
-  - quality checks
+** todo
+   - narrow mode in the output buffer
+   - reports
+     - streaks
+     - bursts
+     - records
+   - report with multiple metrics as separate series
+   - combine multiple metrics with formulas
+   - sync to cloud
+   - quality checks

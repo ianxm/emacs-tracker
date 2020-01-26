@@ -5,7 +5,7 @@
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
 ;; Version: 0.0.4
-;; Keywords: docs
+;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
 ;; This file is not part of GNU Emacs.
@@ -33,6 +33,11 @@
 (require 'seq)
 (require 'timezone)
 (require 'calendar)
+
+(defgroup metrics-tracker nil
+  "Options for customizing Metrics Tracker reports."
+  :group 'diary
+  :tag "Metrics Tracker")
 
 (defcustom metrics-tracker-graph-size '(700 . 500)
   "Specifies the size as (width . height) to be used for graph images."
