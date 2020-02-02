@@ -1,6 +1,6 @@
 [[https://melpa.org/#/metrics-tracker][file:https://melpa.org/packages/metrics-tracker-badge.svg]] [[https://www.gnu.org/licenses/gpl-3.0.txt][file:https://img.shields.io/badge/license-GPL_3-green.svg]]
 
-* metrics-tracker.el
+* metrics tracker
 ** overview
 
    [[http://www.gnu.org/software/emacs/][emacs]] is a text editor.  an extensible one.  it is mainly used for
@@ -21,9 +21,15 @@
 
 ** installation
 
-   metrics-tracker.el is available via ELPA, from the MELPA
-   repository.  it can be installed with ~M-x package-install RET
-   metrics-tracker RET~.
+** melpa
+
+   1. run @@html:<kbd>@@M-x@@html:</kbd>@@ ~package-install~ @@html:<kbd>@@RET@@html:</kbd>@@ ~metrics-tracker~
+
+** manual install
+
+   1. download [[https://raw.github.com/ianxm/emacs-tracker/master/metrics-tracker.el][metrics-tracker.el]]
+   2. run @@html:<kbd>@@M-x@@html:</kbd>@@ ~package-install-file~ @@html:<kbd>@@RET@@html:</kbd>@@
+   3. choose ~metrics-tracker.el~
 
 ** usage
 
@@ -121,9 +127,7 @@ Jan 4, 2020 run dist 2
 
 **** list all metrics
 
-#+BEGIN_SRC
-    M-x metrics-tracker-list
-#+END_SRC
+    @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-list~
 
     this creates a table containing all of the metrics found in your
     emacs diary.
@@ -150,9 +154,7 @@ Jan 4, 2020 run dist 2
 
 **** extract as a table
 
-#+BEGIN_SRC
-    M-x metrics-tracker-table
-#+END_SRC
+     @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-table~
 
     emacs will prompt for the following input parameters:
     - metric-name :: the metric name
@@ -195,9 +197,7 @@ Jan 4, 2020 run dist 2
 
 **** show calendar view
 
-#+BEGIN_SRC
-    M-x metrics-tracker-cal
-#+END_SRC
+     @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-cal~
 
     emacs can extract the data for a metric and render it onto a
     calendar.  the number at each calendar position is one of:
@@ -235,9 +235,7 @@ Jan 4, 2020 run dist 2
     installed on your system and available on your PATH.  I tested
     with gnuplot 5.0.
 
-#+BEGIN_SRC
-    M-x metrics-tracker-graph
-#+END_SRC
+    @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-graph~
 
     emacs will prompt for the same input parameters as in
     ~metrics-tracker-table~ above, as well as:
@@ -282,11 +280,10 @@ Jan 4, 2020 run dist 2
 
     [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/commute_by_week.png]]
 
-    the dimensions of the image can be set by modifying the variable
+    the size of the image can be set by modifying the variable
     `metrics-tracker-graph-size`.
 
 ** todo
-   - narrow mode in the output buffer
    - reports
      - streaks
      - bursts
