@@ -156,7 +156,7 @@ Jan 4, 2020 run dist 2
 
      @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-table~
 
-    emacs will prompt for the following input parameters:
+     emacs will prompt for the following input parameters:
     - metric-name :: the metric name
     - date-grouping :: how many days to clump in each row. one of:
       - day
@@ -195,6 +195,17 @@ Jan 4, 2020 run dist 2
   2019         30.4
 #+END_SRC
 
+    if you want to view multiple metrics, pass an argument to the
+    ~metrics-tracker-table~ command.
+
+    @@html:<kbd>@@C-u@@html:</kbd>@@ @@html:<kbd>@@M-x@@html:</kbd>@@
+    ~metrics-tracker-table~
+
+    when an argument is given, emacs will prompt for metrics names
+    until ~no more~ is given.  all selected metrics will be rendered
+    in the same table.  all other options are the same as in the
+    single metric case.
+
 **** show calendar view
 
      @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-cal~
@@ -227,6 +238,8 @@ Jan 4, 2020 run dist 2
        .     _     _
 
 #+END_SRC
+
+    ~metrics-tracker-cal~ only supports one metric at a time.
 
 **** draw graphs
 
@@ -281,14 +294,34 @@ Jan 4, 2020 run dist 2
     [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/commute_by_week.png]]
 
     the size of the image can be set by modifying the variable
-    `metrics-tracker-graph-size`.
+    ~metrics-tracker-graph-size~.
+
+    if you want to plot multiple metrics, pass an argument to the
+    ~metrics-tracker-graph~ command.
+
+    @@html:<kbd>@@C-u@@html:</kbd>@@ @@html:<kbd>@@M-x@@html:</kbd>@@
+    ~metrics-tracker-graph~
+
+    when an argument is given, emacs will prompt for metrics names
+    until ~no more~ is given.  all selected metrics will be plotted on
+    the same axis. all other plot options are the same as in the
+    single metric case.
+
+    this example shows the percentage of days I bike commuted versus
+    ran by year:
+
+    [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/commute_run_by_year.png]]
+
+    the colors used for each series in the graph can be customized
+    using the ~metrics-tracker-graph-colors~ custom variable, which
+    contains a list of colors specified as hex values.
 
 ** todo
    - reports
      - streaks
      - bursts
      - records
-   - report with multiple metrics as separate series
    - combine multiple metrics with formulas
+   - dark mode for graphs
    - sync to cloud
    - quality checks

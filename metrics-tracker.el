@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.0.4
+;; Version: 0.1.0
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -62,6 +62,11 @@ For example: '(\"pushups\" \"situps\")"
   :type '(list :inline t string)
   :group 'metrics-tracker)
 
+(defcustom metrics-tracker-graph-colors '("#1f77b4" "#ff7f0e" "#2ca02c" "#d62728" "#9467bd" "#8c564b" "#e377c2" "#7f7f7f" "#bcbd22" "#17becf")
+  "Colors to use for each series in graphs."
+  :type '(list :inline t string)
+  :group 'metrics-tracker)
+
 (defvar metrics-tracker-metric-index nil
   "This is the list of metrics read from the diary file.
 It is a list containing: (name count first last) for each metric.
@@ -84,6 +89,19 @@ the diary file to be re-read if the data is needed again.")
 (defmacro metrics-tracker--max-date (d1 d2)
   "Return the later of the given dates D1 and D2."
   `(if (time-less-p ,d1 ,d2) ,d2 ,d1))
+
+(defmacro metrics-tracker--define-plot (num-lines plot-definition)
+  "Render the plot definition line to the current buffer.
+NUM-LINES is the number of lines to include in the plot.
+PLOT-DEFINITION is the gnuplot config command that defines the lines, bars, or points."
+  `(progn
+    (insert "plot ")
+    (dotimes (ii ,num-lines)
+      (let ((dash (if (= 0 ii) "-" ""))
+            (label (if (= 1 num-lines) "notitle" (format "title \"%s\"" (nth ii metric-names))))
+            (comma (if (< ii (1- num-lines)) ", " "")))
+        (insert (format ,plot-definition dash (+ ii 2) label (nth ii metrics-tracker-graph-colors) comma))))
+    (insert "\n")))
 
 (defun metrics-tracker--process-diary (filter action)
   "Parse the diary file.
@@ -186,7 +204,11 @@ This reads the diary file and populated in
 (defmacro metrics-tracker--num-sort (col)
   "Sort string numbers in column COL of a tabulated list."
   `(lambda (x y) (< (string-to-number (elt (nth 1 x) ,col))
-                   (string-to-number (elt (nth 1 y) ,col)))))
+                    (string-to-number (elt (nth 1 y) ,col)))))
+
+(defmacro metrics-tracker--sort-dates (dates)
+  "Sort a list of DATES."
+  `(sort ,dates (lambda (a b) (time-less-p a b))))
 
 ;;;###autoload
 (defun metrics-tracker-list ()
@@ -201,8 +223,8 @@ This reads the diary file."
 
   ;; set headers
   (let ((metric-name-width (seq-reduce (lambda (width ii) (max width (length ii)))
-                                      (mapcar (lambda (ii) (symbol-name (nth 0 ii))) metrics-tracker-metric-index)
-                                      10)))
+                                       (mapcar (lambda (ii) (symbol-name (nth 0 ii))) metrics-tracker-metric-index)
+                                       10)))
     (setq-local tabulated-list-format (vector (list "metric" metric-name-width t)
                                               (list "days ago" 10 (metrics-tracker--num-sort 1))
                                               (list "first" 12 t)
@@ -373,8 +395,7 @@ ALLOW-GAPS-P is t, don't fill in gaps."
                                    found-value (gethash date-bin bin-data))
                              (if found-value
                                  (puthash date-bin (+ found-value (metrics-tracker--val-to-bin value value-transform)) bin-data)
-                               (puthash date-bin (metrics-tracker--val-to-bin value value-transform) bin-data))))
-         sorted-bin-data)
+                               (puthash date-bin (metrics-tracker--val-to-bin value value-transform) bin-data)))))
 
     (metrics-tracker--process-diary table-filter-fcn table-action-fcn)
 
@@ -387,15 +408,14 @@ ALLOW-GAPS-P is t, don't fill in gaps."
           (unless (gethash current-date-bin bin-data)
             (puthash current-date-bin 0 bin-data)))))
 
-    ;; convert to alist and sort
-    (maphash (lambda (key value) (setq sorted-bin-data (cons (cons key value) sorted-bin-data))) bin-data)
-    (setq sorted-bin-data (sort sorted-bin-data (lambda (a b) (time-less-p (car a) (car b)))))
-
-    ;; apply value transform (old cdr was count or total, new cdr is requested value transform)
-    (dolist (bin sorted-bin-data)
-      (setcdr bin (metrics-tracker--bin-to-val (cdr bin) value-transform date-grouping
-                                       (car bin) first-date today)))
-    sorted-bin-data))
+    ;; apply the value transform to the hashtable values
+    (maphash (lambda (date bin)
+               (puthash date
+                        (metrics-tracker--bin-to-val bin value-transform date-grouping
+                                                          date first-date today)
+                        bin-data))
+             bin-data)
+    bin-data))
 
 (defun metrics-tracker--setup-output-buffer ()
   "Create and clear the output buffer."
@@ -426,21 +446,38 @@ https://emacs.stackexchange.com/questions/41801/how-to-stop-completing-read-ivy-
       (complete-with-action
        action options string pred))))
 
+(defun metrics-tracker--ask-for-metrics (multp)
+  "Prompt for metric names.
+If MULTP is false, only ask for one metric, else loop until
+\"no more\" is chosen.  Return the selected list of metric names."
+  (let* ((all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
+         (last-metric-name (completing-read "Metric: " (metrics-tracker--presorted-options all-metric-names) nil t))
+         (metric-names (cons last-metric-name nil)))
+    (setq all-metric-names (cons "no more" all-metric-names))
+    (while (and (not (string= last-metric-name "no more"))
+                multp)
+      (setq all-metric-names (seq-remove (lambda (elt) (string= elt last-metric-name)) all-metric-names)
+            last-metric-name (completing-read "Metric: " (metrics-tracker--presorted-options all-metric-names) nil t))
+      (if (not (string= last-metric-name "no more"))
+          (setq metric-names (cons last-metric-name metric-names))))
+    (reverse metric-names)))
+
 ;;;###autoload
-(defun metrics-tracker-table ()
-  "Get a tabular view of the requested metric."
-  (interactive)
+(defun metrics-tracker-table (arg)
+  "Get a tabular view of the requested metric.
+If ARG is given, allow selection of multiple metrics."
+  (interactive "P")
 
   ;; make sure `metrics-tracker-metric-index' has been populated
   (metrics-tracker--load-index)
 
   (let* ((ivy-sort-functions-alist nil)
-         (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
          (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                              (seq-take (parse-time-string (format-time-string "%F")) 6))))
          ;; ask for params
-         (metric-name-str (completing-read "Metric: " (metrics-tracker--presorted-options all-metric-names) nil t))
-         (metric-name (intern metric-name-str metrics-tracker-metric-names))
+         (multp (not (null arg)))
+         (metric-names-str (metrics-tracker--ask-for-metrics multp))
+         (metric-names (mapcar (lambda (name) (intern name metrics-tracker-metric-names)) metric-names-str))
          (date-grouping-str (completing-read "Group dates by: " (metrics-tracker--presorted-options
                                                                  (metrics-tracker--date-grouping-options))
                                              nil t nil nil "month"))
@@ -448,34 +485,51 @@ https://emacs.stackexchange.com/questions/41801/how-to-stop-completing-read-ivy-
          (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
                                                                         (metrics-tracker--value-transform-options date-grouping))
                                                    nil t nil nil "total")))
-         ;; load metric data into bins
-         (sorted-bin-data (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today)))
+         ;; load metric data into bins; list of `bin-data' for each metric in the same order as `metric-names'
+         (bin-data-all (mapcar (lambda (metric-name) (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today))
+                               metric-names))
+         merged-dates)
 
-    ;; print
-    (if (eq date-grouping 'full)
+    ;; merge dates and sort
+    (setq merged-dates (seq-reduce (lambda (dates ii) (append (hash-table-keys ii) dates))
+                                   bin-data-all
+                                   nil))
+    (delete-dups merged-dates)
+    (setq merged-dates (metrics-tracker--sort-dates merged-dates))
+
+    (if (and (eq date-grouping 'full)
+             (not multp))
+        ;; if there's only one value to print, just write it to the status line
         (message "Overall %s %s: %s"
-                 metric-name
+                 (car metric-names)
                  (replace-regexp-in-string "-" " " (symbol-name value-transform))
-                 (cdar sorted-bin-data))
+                 (gethash 'full (car bin-data-all)))
 
+      ;; otherwise write a table
       (metrics-tracker--setup-output-buffer)
       (tabulated-list-mode)
 
-      ;; set headers
-      (setq tabulated-list-format (vector (list date-grouping-str 12 t)
-                                          (list (format "%s %s" metric-name-str
-                                                        (replace-regexp-in-string "-" " " (symbol-name value-transform)))
-                                                10
-                                                (metrics-tracker--num-sort 1))))
+      ;; set table headers
+      (setq tabulated-list-format
+            (vconcat (list (list date-grouping-str 12 t))
+                     (mapcar (lambda (metric-name)
+                               (let ((label (format "%s %s" metric-name (replace-regexp-in-string "-" " " (symbol-name value-transform)))))
+                                 (list label (max 10 (1+ (length label))) (metrics-tracker--num-sort 1))))
+                             metric-names-str)))
+
       ;; configure
       (setq tabulated-list-padding 2)
       (setq tabulated-list-sort-key (cons date-grouping-str nil))
 
-      ;; set data
+      ;; set table data
       (let (data date-str)
-        (dolist (bin sorted-bin-data)
-          (setq date-str (format-time-string (metrics-tracker--format-bin date-grouping) (car bin))
-                data (cons (list date-str (vector date-str (cdr bin)))
+        (dolist (date merged-dates)
+          (setq date-str (if (eq date-grouping 'full)
+                             "full"
+                           (format-time-string (metrics-tracker--format-bin date-grouping) date)))
+          (setq data (cons (list date-str
+                                 (vconcat (list date-str)
+                                          (mapcar (lambda (bin-data) (gethash date bin-data "")) bin-data-all)))
                            data))
           (setq-local tabulated-list-entries data)))
 
@@ -505,21 +559,28 @@ https://emacs.stackexchange.com/questions/41801/how-to-stop-completing-read-ivy-
                                                                         (metrics-tracker--value-transform-options 'day))
                                                    nil t nil nil "total")))
          ;; load metric data into bins
-         (sorted-bin-data (metrics-tracker--bin-metric-data metric-name 'day value-transform today t)))
+         (bin-data (metrics-tracker--bin-metric-data metric-name 'day value-transform today t))
+         ;; find the first date
+         (dates (hash-table-keys bin-data))
+         (first (seq-reduce (lambda (first ii) (if (time-less-p first ii) first ii))
+                                    dates (car dates))))
 
     (metrics-tracker--setup-output-buffer)
     (fundamental-mode)
 
     ;; render the calendars
     (let* ((inhibit-read-only t)
-           (first (caar sorted-bin-data))
            (first-decoded (decode-time first))
            (month (nth 4 first-decoded))
-           (year (nth 5 first-decoded)))
+           (year (nth 5 first-decoded))
+           (today-decoded (decode-time today))
+           (this-month (nth 4 today-decoded))
+           (this-year (nth 5 today-decoded)))
       (insert (format "  %s\n\n" metric-name-str))
       (put-text-property (point-min) (point-max) 'face 'bold)
-      (while sorted-bin-data
-        (setq sorted-bin-data (metrics-tracker--print-month month year sorted-bin-data first today))
+      (while (or (<= month this-month)
+                 (< year this-year))
+        (metrics-tracker--print-month month year bin-data first today)
         (insert "\n\n\n")
         (setq month (1+ month))
         (when (> month 12)
@@ -528,48 +589,73 @@ https://emacs.stackexchange.com/questions/41801/how-to-stop-completing-read-ivy-
 
     (metrics-tracker--show-output-buffer)))
 
-(defun metrics-tracker--print-month (month year sorted-bin-data first today)
+(defun metrics-tracker--print-month (month year bin-data first today)
   "Write metric data as a calendar for MONTH of YEAR.
-SORTED-BIN-DATA contains the data to render.  It ranges from FIRST
-until TODAY, which are time values."
+BIN-DATA contains the data to render, in a hashtable as \"time ->
+value\".  It ranges from FIRST until TODAY, which are time
+values."
   (let ((first-day (encode-time 0 0 0 1 month year))
         day)
     (insert (format "                    %s\n\n" (format-time-string "%b %Y" first-day)))
-    (insert "    Su    Mo    Tu    We    Th    Fr    Sa\n  ")
+    (insert "      Su    Mo    Tu    We    Th    Fr    Sa\n  ")
     (dotimes (_ii (nth 6 (decode-time first-day)))
       (insert "      "))
     (dotimes (daynum (metrics-tracker--days-of-month first-day))
       (setq day (encode-time 0 0 0 (1+ daynum) month year))
-      (cond ((equal day (caar sorted-bin-data)) (insert (format "%6s" (cdr (pop sorted-bin-data)))))
+      (cond ((gethash day bin-data) (insert (format "%6s" (gethash day bin-data))))
             ((time-less-p day first) (insert "     _")) ; before data
             ((time-less-p today day) (insert "     _")) ; after today
             (t (insert "     .")))                      ; gap in data
       (when (= (nth 6 (decode-time day)) 6)
-          (insert "\n  "))))
-  sorted-bin-data)
+          (insert "\n  ")))))
 
-(defun metrics-tracker--make-gnuplot-config (metric-name
+(defun metrics-tracker--make-gnuplot-config (metric-names
                                      date-grouping value-transform
-                                     sorted-bin-data
+                                     bin-data-all
                                      graph-type graph-output fname)
   "Write a gnuplot config (including inline data) to the (empty) current buffer.
-The gnuplot config depends on many variables which must all be
-passed in: METRIC-NAME, DATE-GROUPING, VALUE-TRANSFORM,
-SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
-  (let ((date-format (metrics-tracker--format-bin date-grouping))
+METRIC-NAMES a list of metric names being plotted.
+DATE-GROUPING the name of the date grouping used to bin the data.
+VALUE-TRANSFORM the name of the value transform used on each bin.
+BIN-DATA-ALL a list bin-data (which is a hash of dates to values) in the same order as METRIC-NAMEs.
+GRAPH-TYPE the type of graph (line, bar, scatter).
+GRAPH-OUTPUT the graph output format (ascii, svg, png).
+FNAME is the filename of the temp file to write."
+  (let (merged-dates data num-lines
+        (date-format (metrics-tracker--format-bin date-grouping))
         (term (cond ((eq graph-output 'svg) "svg")
                     ((eq graph-output 'png) "pngcairo")
                     (t "dumb")))
         (width (if (eq graph-output 'ascii) (1- (window-width)) (car metrics-tracker-graph-size)))
-        (height (if (eq graph-output 'ascii) (1- (window-height)) (cdr metrics-tracker-graph-size))))
+        (height (if (eq graph-output 'ascii) (1- (window-height)) (cdr metrics-tracker-graph-size)))
+        (title (if (= 1 (length metric-names)) (car metric-names) "")))
+
+    ;; merge dates and sort
+    (setq merged-dates (seq-reduce (lambda (dates ii) (append (hash-table-keys ii) dates))
+                                   bin-data-all
+                                   nil))
+    (delete-dups merged-dates)
+    (setq merged-dates (metrics-tracker--sort-dates merged-dates))
+
+    ;; set table data
+    (let (date-str)
+      (dolist (date merged-dates)
+        (setq date-str (if (eq date-grouping 'full)
+                           "full"
+                         (format-time-string (metrics-tracker--format-bin date-grouping) date)))
+        (setq data (cons (append (list date-str)
+                                 (mapcar (lambda (bin-data) (gethash date bin-data ".")) bin-data-all))
+                         data)))
+      (setq data (reverse data))
+      (setq num-lines (1- (length (car data)))))
+
     (cond ((eq graph-output 'ascii)
            (insert (format "set term %s size %d, %d\n\n" term width height))
-           (insert (format "set title \"%s %s\"\n"
-                           metric-name
+           (insert (format "set title \"%s %s\"\n" title
                            (replace-regexp-in-string "-" " " (symbol-name value-transform)))))
           (t
            (insert (format "set term %s size %d, %d background rgb \"gray90\"\n\n" term width height))
-           (insert (format "set title \"%s\"\n" metric-name))
+           (insert (format "set title \"%s\"\n" title))
            (insert (format "set output \"%s\"\n" fname))))
     (insert (format "set xlabel \"%s\"\n" date-grouping))
     (when date-format ; not 'full
@@ -579,8 +665,9 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
     (cond ((eq graph-type 'line)
            (insert "set xdata time\n")
            (insert "set xtics rotate\n")
-           (insert "set style line 1 lw 1.2 \n")
-           (insert "plot \"-\" using 1:2 with lines notitle ls 1 lc rgbcolor \"#399320\"\n"))
+           (metrics-tracker--define-plot
+            num-lines
+            "\"%s\" using 1:%d with lines %s lt 1 lw 1.2 lc rgbcolor \"%s\"%s"))
           ((eq graph-type 'bar)
            (insert "set xtics rotate\n")
            (insert "set boxwidth 0.9 relative\n")
@@ -588,25 +675,28 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
            (insert "set style data histogram\n")
            (insert "set style histogram cluster\n")
            (insert "set style fill solid\n")
-           (insert "plot \"-\" using 2:xtic(1) notitle lc rgbcolor \"#399320\"\n"))
+           (metrics-tracker--define-plot
+            num-lines
+            "\"%s\" using %d:xtic(1) %s lc rgbcolor \"%s\"%s"))
           ((eq graph-type 'scatter)
            (insert "set xdata time\n")
            (insert "set xtics rotate\n")
            (insert "set style line 1 pt 7 ps 0.5\n")
-           (insert "plot \"-\" using 1:2 with points notitle ls 1 lc rgbcolor \"#399320\"\n")))
-    (if (not date-format)
-        (insert (format ". %s\n" (cdar sorted-bin-data)))
-      (insert (mapconcat (lambda (x) (format "%s %s"
-                                             (format-time-string date-format (car x))
-                                             (cdr x)))
-                         sorted-bin-data
-                         "\n")))
-    (insert "\ne")))
+           (metrics-tracker--define-plot
+            num-lines
+            "\"%s\" using 1:%d with points %s lc rgbcolor \"%s\"%s")))
+    (dotimes (_ii num-lines)
+      (if (not date-format)
+          (insert (format ". %s\n" (cdar data)))
+        (dolist (entry data)
+          (insert (concat (mapconcat #'identity entry " ") "\n"))))
+      (insert "\ne\n"))))
 
 ;;;###autoload
-(defun metrics-tracker-graph ()
-  "Get a graph of the requested metric."
-  (interactive)
+(defun metrics-tracker-graph (arg)
+  "Get a graph of the requested metric.
+If ARG is given, allow selection of multiple metrics."
+  (interactive "P")
 
   (metrics-tracker--check-gnuplot-exists)
 
@@ -614,13 +704,15 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
   (metrics-tracker--load-index)
 
   (let* ((ivy-sort-functions-alist nil)
-         (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
          (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                              (seq-take (parse-time-string (format-time-string "%F")) 6))))
          ;; ask for params
-         (metric-name (intern (completing-read "Metric: " (metrics-tracker--presorted-options all-metric-names) nil t) metrics-tracker-metric-names))
+         (multp (not (null arg)))
+         (metric-names-str (metrics-tracker--ask-for-metrics multp))
+         (metric-names (mapcar (lambda (name) (intern name metrics-tracker-metric-names)) metric-names-str))
          (date-grouping (intern (completing-read "Group dates by: " (metrics-tracker--presorted-options
-                                                                     (metrics-tracker--date-grouping-options)) nil t nil nil "month")))
+                                                                     (metrics-tracker--date-grouping-options))
+                                                 nil t nil nil "month")))
          (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
                                                                         (metrics-tracker--value-transform-options date-grouping))
                                                    nil t nil nil "total")))
@@ -629,16 +721,18 @@ SORTED-BIN-DATA, GRAPH-TYPE, GRAPH-OUTPUT, FNAME."
          (graph-output (intern (completing-read "Graph output: " (metrics-tracker--presorted-options
                                                                   metrics-tracker-graph-output-options)
                                                 nil t nil nil "ascii")))
-         ;; load metric data into bins
-         (sorted-bin-data (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today))
+         ;; load metric data into bins; list of `bin-data' for each metric in the same order as `metric-names'
+         (bin-data-all (mapcar (lambda (metric-name) (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today))
+                               metric-names))
+
          ;; prep output buffer
          (buffer (get-buffer-create metrics-tracker-output-buffer-name))
          (fname (and (not (eq graph-output 'ascii)) (make-temp-file "metrics-tracker"))))
 
     (with-temp-buffer
-      (metrics-tracker--make-gnuplot-config metric-name
+      (metrics-tracker--make-gnuplot-config metric-names
                                     date-grouping value-transform
-                                    sorted-bin-data
+                                    bin-data-all
                                     graph-type graph-output fname)
       (save-current-buffer
         (metrics-tracker--setup-output-buffer)
