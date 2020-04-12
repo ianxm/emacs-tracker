@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.1.0
+;; Version: 0.1.1
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -421,6 +421,7 @@ ALLOW-GAPS-P is t, don't fill in gaps."
   "Create and clear the output buffer."
   (let ((buffer (get-buffer-create metrics-tracker-output-buffer-name)))
     (set-buffer buffer)
+    (read-only-mode)
     (let ((inhibit-read-only t))
       (erase-buffer))))
 
