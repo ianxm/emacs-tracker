@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.1.1
+;; Version: 0.1.2
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -89,19 +89,6 @@ the diary file to be re-read if the data is needed again.")
 (defmacro metrics-tracker--max-date (d1 d2)
   "Return the later of the given dates D1 and D2."
   `(if (time-less-p ,d1 ,d2) ,d2 ,d1))
-
-(defmacro metrics-tracker--define-plot (num-lines plot-definition)
-  "Render the plot definition line to the current buffer.
-NUM-LINES is the number of lines to include in the plot.
-PLOT-DEFINITION is the gnuplot config command that defines the lines, bars, or points."
-  `(progn
-    (insert "plot ")
-    (dotimes (ii ,num-lines)
-      (let ((dash (if (= 0 ii) "-" ""))
-            (label (if (= 1 num-lines) "notitle" (format "title \"%s\"" (nth ii metric-names))))
-            (comma (if (< ii (1- num-lines)) ", " "")))
-        (insert (format ,plot-definition dash (+ ii 2) label (nth ii metrics-tracker-graph-colors) comma))))
-    (insert "\n")))
 
 (defun metrics-tracker--process-diary (filter action)
   "Parse the diary file.
@@ -610,89 +597,6 @@ values."
       (when (= (nth 6 (decode-time day)) 6)
           (insert "\n  ")))))
 
-(defun metrics-tracker--make-gnuplot-config (metric-names
-                                     date-grouping value-transform
-                                     bin-data-all
-                                     graph-type graph-output fname)
-  "Write a gnuplot config (including inline data) to the (empty) current buffer.
-METRIC-NAMES a list of metric names being plotted.
-DATE-GROUPING the name of the date grouping used to bin the data.
-VALUE-TRANSFORM the name of the value transform used on each bin.
-BIN-DATA-ALL a list bin-data (which is a hash of dates to values) in the same order as METRIC-NAMEs.
-GRAPH-TYPE the type of graph (line, bar, scatter).
-GRAPH-OUTPUT the graph output format (ascii, svg, png).
-FNAME is the filename of the temp file to write."
-  (let (merged-dates data num-lines
-        (date-format (metrics-tracker--format-bin date-grouping))
-        (term (cond ((eq graph-output 'svg) "svg")
-                    ((eq graph-output 'png) "pngcairo")
-                    (t "dumb")))
-        (width (if (eq graph-output 'ascii) (1- (window-width)) (car metrics-tracker-graph-size)))
-        (height (if (eq graph-output 'ascii) (1- (window-height)) (cdr metrics-tracker-graph-size)))
-        (title (if (= 1 (length metric-names)) (car metric-names) "")))
-
-    ;; merge dates and sort
-    (setq merged-dates (seq-reduce (lambda (dates ii) (append (hash-table-keys ii) dates))
-                                   bin-data-all
-                                   nil))
-    (delete-dups merged-dates)
-    (setq merged-dates (metrics-tracker--sort-dates merged-dates))
-
-    ;; set table data
-    (let (date-str)
-      (dolist (date merged-dates)
-        (setq date-str (if (eq date-grouping 'full)
-                           "full"
-                         (format-time-string (metrics-tracker--format-bin date-grouping) date)))
-        (setq data (cons (append (list date-str)
-                                 (mapcar (lambda (bin-data) (gethash date bin-data ".")) bin-data-all))
-                         data)))
-      (setq data (reverse data))
-      (setq num-lines (1- (length (car data)))))
-
-    (cond ((eq graph-output 'ascii)
-           (insert (format "set term %s size %d, %d\n\n" term width height))
-           (insert (format "set title \"%s %s\"\n" title
-                           (replace-regexp-in-string "-" " " (symbol-name value-transform)))))
-          (t
-           (insert (format "set term %s size %d, %d background rgb \"gray90\"\n\n" term width height))
-           (insert (format "set title \"%s\"\n" title))
-           (insert (format "set output \"%s\"\n" fname))))
-    (insert (format "set xlabel \"%s\"\n" date-grouping))
-    (when date-format ; not 'full
-      (insert (format "set timefmt \"%s\"\n" date-format))
-      (insert (format "set format x \"%s\"\n" date-format)))
-    (insert (format "set ylabel \"%s\"\n" value-transform))
-    (cond ((eq graph-type 'line)
-           (insert "set xdata time\n")
-           (insert "set xtics rotate\n")
-           (metrics-tracker--define-plot
-            num-lines
-            "\"%s\" using 1:%d with lines %s lt 1 lw 1.2 lc rgbcolor \"%s\"%s"))
-          ((eq graph-type 'bar)
-           (insert "set xtics rotate\n")
-           (insert "set boxwidth 0.9 relative\n")
-           (insert "set yrange [0:]\n")
-           (insert "set style data histogram\n")
-           (insert "set style histogram cluster\n")
-           (insert "set style fill solid\n")
-           (metrics-tracker--define-plot
-            num-lines
-            "\"%s\" using %d:xtic(1) %s lc rgbcolor \"%s\"%s"))
-          ((eq graph-type 'scatter)
-           (insert "set xdata time\n")
-           (insert "set xtics rotate\n")
-           (insert "set style line 1 pt 7 ps 0.5\n")
-           (metrics-tracker--define-plot
-            num-lines
-            "\"%s\" using 1:%d with points %s lc rgbcolor \"%s\"%s")))
-    (dotimes (_ii num-lines)
-      (if (not date-format)
-          (insert (format ". %s\n" (cdar data)))
-        (dolist (entry data)
-          (insert (concat (mapconcat #'identity entry " ") "\n"))))
-      (insert "\ne\n"))))
-
 ;;;###autoload
 (defun metrics-tracker-graph (arg)
   "Get a graph of the requested metric.
@@ -755,6 +659,103 @@ If ARG is given, allow selection of multiple metrics."
           (goto-char (point-min))))
 
       (metrics-tracker--show-output-buffer))))
+
+(defun metrics-tracker--make-gnuplot-config (metric-names
+                                     date-grouping value-transform
+                                     bin-data-all
+                                     graph-type graph-output fname)
+  "Write a gnuplot config (including inline data) to the (empty) current buffer.
+METRIC-NAMES a list of metric names being plotted.
+DATE-GROUPING the name of the date grouping used to bin the data.
+VALUE-TRANSFORM the name of the value transform used on each bin.
+BIN-DATA-ALL a list bin-data (which is a hash of dates to values) in the same order as METRIC-NAMEs.
+GRAPH-TYPE the type of graph (line, bar, scatter).
+GRAPH-OUTPUT the graph output format (ascii, svg, png).
+FNAME is the filename of the temp file to write."
+  (let (merged-dates data num-lines
+        (date-format (metrics-tracker--format-bin date-grouping))
+        (term (cond ((eq graph-output 'svg) "svg")
+                    ((eq graph-output 'png) "pngcairo")
+                    (t "dumb")))
+        (width (if (eq graph-output 'ascii) (1- (window-width)) (car metrics-tracker-graph-size)))
+        (height (if (eq graph-output 'ascii) (1- (window-height)) (cdr metrics-tracker-graph-size)))
+        (title (if (= 1 (length metric-names)) (car metric-names) "")))
+
+    ;; merge dates and sort
+    (setq merged-dates (seq-reduce (lambda (dates ii) (append (hash-table-keys ii) dates))
+                                   bin-data-all
+                                   nil))
+    (delete-dups merged-dates)
+    (setq merged-dates (metrics-tracker--sort-dates merged-dates))
+
+    ;; set table data
+    (let (date-str)
+      (dolist (date merged-dates)
+        (setq date-str (if (eq date-grouping 'full)
+                           "full"
+                         (format-time-string (metrics-tracker--format-bin date-grouping) date)))
+        (setq data (cons (append (list date-str)
+                                 (mapcar (lambda (bin-data) (gethash date bin-data ".")) bin-data-all))
+                         data)))
+      (setq data (reverse data))
+      (setq num-lines (1- (length (car data)))))
+
+    (cond ((eq graph-output 'ascii)
+           (insert (format "set term %s size %d, %d\n\n" term width height))
+           (insert (format "set title \"%s %s\"\n" title
+                           (replace-regexp-in-string "-" " " (symbol-name value-transform)))))
+          (t ; output an image
+           (insert (format "set term %s size %d, %d background rgb \"gray90\"\n\n" term width height))
+           (insert (format "set title \"%s\"\n" title))
+           (insert (format "set output \"%s\"\n" fname))))
+    (insert (format "set xlabel \"%s\"\n" date-grouping))
+    (when date-format ; not 'full
+      (insert (format "set timefmt \"%s\"\n" date-format))
+      (insert (format "set format x \"%s\"\n" date-format)))
+    (insert (format "set ylabel \"%s\"\n" value-transform))
+    (cond ((eq graph-type 'line)
+           (insert "set xdata time\n")
+           (insert "set xtics rotate\n"))
+          ((eq graph-type 'bar)
+           (insert "set xtics rotate\n")
+           (insert "set boxwidth 0.9 relative\n")
+           (insert "set yrange [0:]\n")
+           (insert "set style data histogram\n")
+           (insert "set style histogram cluster\n")
+           (insert "set style fill solid\n"))
+          ((eq graph-type 'scatter)
+           (insert "set xdata time\n")
+           (insert "set xtics rotate\n")
+           (insert "set style line 1 pt 7 ps 0.5\n")))
+    (insert (metrics-tracker--define-plot graph-type num-lines metric-names) "\n")
+    (dotimes (_ii num-lines)
+      (if (not date-format)
+          (insert (format ". %s\n" (cdar data)))
+        (dolist (entry data)
+          (insert (concat (mapconcat #'identity entry " ") "\n"))))
+      (insert "\ne\n"))))
+
+(defun metrics-tracker--define-plot (graph-type num-lines metric-names)
+  "Return the plot definition command.
+GRAPH-TYPE is line, bar, point
+NUM-LINES is the number of lines to include in the plot.
+METRIC-NAMES is the list of metric names being plotted."
+  (let ((plot-def "plot"))
+    (dotimes (ii num-lines)
+      (let ((dash (if (= 0 ii) "-" ""))
+            (label (if (= 1 num-lines) "notitle" (format "title \"%s\"" (nth ii metric-names))))
+            (comma (if (< ii (1- num-lines)) "," "")))
+        (cond
+         ((eq graph-type 'line)
+          (setq plot-def (concat plot-def (format " \"%s\" using 1:%d with lines %s lt %s lw 1.2 lc rgbcolor \"%s\"%s"
+                                                  dash (+ ii 2) label (1+ ii) (nth ii metrics-tracker-graph-colors) comma))))
+         ((eq graph-type 'bar)
+          (setq plot-def (concat plot-def (format " \"%s\" using %d:xtic(1) %s lc rgbcolor \"%s\"%s"
+                                                  dash (+ ii 2) label (nth ii metrics-tracker-graph-colors) comma))))
+         ((eq graph-type 'scatter)
+          (setq plot-def (concat plot-def (format " \"%s\" using 1:%d with points %s lc rgbcolor \"%s\"%s"
+                                                  dash (+ ii 2) label (nth ii metrics-tracker-graph-colors) comma)))))))
+    plot-def))
 
 (provide 'metrics-tracker)
 
