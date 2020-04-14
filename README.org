@@ -74,13 +74,19 @@
                      with readability.  valid values may look like:
       - ~pushups~
       - ~watched tv~
-    - value :: is a number (integer or decimal).  metrics-tracker.el
-               doesn't care about units.  ~value~ is just a number.  if
-               you're tracking how much tv you watch, a "4" could mean
-               4 shows or 4 hours; it's up to you.  do not include
-               commas. valid values may be:
+    - value :: is a number (integer or decimal) or a duration
+               (hh:mm:ss.ss).  for number values, metrics-tracker.el
+               doesn't care about units.  ~value~ is just a number.
+               if you're tracking how much tv you watch, a "4" could
+               mean 4 shows or 4 hours; it's up to you.  do not
+               include commas.  for duration values, hours and
+               fractional seconds are optional.  metrics-tracker.el
+               converts durations to decimal hours.  valid values may
+               be:
       - ~40~
       - ~1.2~
+      - ~10:21.21~
+      - ~3:00:10~
 
     here is an example diary file where all entries are valid metrics.
     there's no advantage to mixing date formats.  the example does it

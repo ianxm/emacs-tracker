@@ -82,6 +82,8 @@ the diary file to be re-read if the data is needed again.")
 (defconst metrics-tracker-output-buffer-name "*Metrics Tracker Output*"
   "The name of the output buffer.")
 
+(define-error 'metrics-tracker-invalid-value "The given value cannot be parsed")
+
 (defmacro metrics-tracker--min-date (d1 d2)
   "Return the earlier of the given dates D1 and D2."
   `(if (time-less-p ,d1 ,d2) ,d1 ,d2))
@@ -99,12 +101,12 @@ Valid metrics entries look like \"DATE TIME METRICNAME VALUE\" where
 - DATE looks like \"2020-01-01\" or \"Jan 1, 2020\" or \"1 Jan 2020\"
 - TIME (which we ignore) looks like \"10:30\" or \"10:30a\" or \"10:30 am\"
 - METRICNAME is any string, whitespace included
-- VALUE is a decimal number like \"1\" or \"1.2\""
+- VALUE is a decimal number like \"1\" or \"1.2\" or a duration value like \"10:01\" or \"1:20:32.21\""
 
-  (let ((valid-formats '("^\\([[:digit:]]\\{4\\}\-[[:digit:]]\\{2\\}\-[[:digit:]]\\{2\\}\\) *\\(?:[[:digit:]\:]+ ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$"     ; YYYY-MM-DD
-                         "^\\([[:digit:]]\\{2\\}\/[[:alpha:]]+\/[[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]+ ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$"           ; DD/MMM/YYYY
-                         "^\\([[:alpha:]]+ [[:digit:]]\\{1,2\\}, [[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]\\{1,8\\} ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$"  ; MMM DD, YYYY
-                         "^\\([[:digit:]]\\{1,2\\} [[:alpha:]]+ [[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]\\{1,8\\} ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.]+\\)$")) ; DD MMM YYYY
+  (let ((valid-formats '("^\\([[:digit:]]\\{4\\}\-[[:digit:]]\\{2\\}\-[[:digit:]]\\{2\\}\\) *\\(?:[[:digit:]\:]+ ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$"     ; YYYY-MM-DD
+                         "^\\([[:digit:]]\\{2\\}\/[[:alpha:]]+\/[[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]+ ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$"           ; DD/MMM/YYYY
+                         "^\\([[:alpha:]]+ [[:digit:]]\\{1,2\\}, [[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]\\{1,8\\} ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$"  ; MMM DD, YYYY
+                         "^\\([[:digit:]]\\{1,2\\} [[:alpha:]]+ [[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]\\{1,8\\} ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$")) ; DD MMM YYYY
         metric-name metric-date metric-value foundp)
     (with-temp-buffer
       (insert-file-contents diary-file)
@@ -117,11 +119,32 @@ Valid metrics entries look like \"DATE TIME METRICNAME VALUE\" where
                     (setq metric-date (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                                                    (seq-take (parse-time-string (match-string 1 line)) 6)))
                           metric-name (intern (match-string 2 line) metrics-tracker-metric-names)
-                          metric-value (string-to-number (match-string 3 line))
+                          metric-value (metrics-tracker--try-read-value (match-string 3 line))
                           foundp t)))
               (if (and foundp (funcall filter metric-date metric-name))
                   (funcall action metric-date metric-name metric-value)))
-            (error (message "error parsing line: %s" line)))))))
+          (metrics-tracker-invalid-value nil) ; the regexes aren't strict enough to filter this out, but it should be skipped
+          (error (message "error parsing line: %s" line)))))))
+
+(defun metrics-tracker--try-read-value (string-value)
+  "Read a value from the given string, or signal that no value can be read.
+
+Any string that matches the `valid-formats' regex can end up
+here, but not all can be parsed (for example \"10::21\").  In
+those cases we raise the `metric-tracker-invalid-value' signal.
+
+STRING-VALUE is a string containing a metric value.  It may be
+formatted as a number (10.21) or a duration (10:21). Hours are
+optional for duration values."
+  (cond((string-match "^\\(?:\\([[:digit:]]\\{1,2\\}\\):\\)?\\([[:digit:]]\\{2\\}\\):\\([[:digit:]]\\{2\\}\\(?:\\.[[:digit:]]*\\)?\\)$" string-value) ; duration as hh:mm:ss.ms
+         (let ((h (if (match-string 1 string-value) (string-to-int (match-string 1 string-value)) 0))
+               (m (string-to-int (match-string 2 string-value)))
+               (s (string-to-number (match-string 3 string-value))))
+           (+ h (/ m 60.0) (/ s 3600.0)))) ; return duration in hours
+        ((string-match "^[[:digit:]\.]+$" string-value) ; number like 10.21
+         (string-to-number string-value))
+        (t ; skip
+         (signal 'metrics-tracker-invalid-value string-value))))
 
 (defun metrics-tracker-clear-data ()
   "Clear cached data and delete tempfiles.
@@ -356,7 +379,7 @@ needed to determine the number of days in the current bin."
                        ((eq date-grouping 'full) (float (- (time-to-days today)
                                                            (time-to-days first-date)))))))
     (cond
-     ((eq value-transform 'total) (format "%g" value))
+     ((eq value-transform 'total) (format "%.2f" value))
      ((eq value-transform 'count) (format "%d" value))
      ((eq value-transform 'percent) (format "%.1f" (* (/ value bin-duration) 100)))
      ((eq value-transform 'per-day) (format "%.1f" (* value (/ 1 bin-duration))))
