@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.1.2
+;; Version: 0.1.3
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -136,7 +136,7 @@ those cases we raise the `metric-tracker-invalid-value' signal.
 STRING-VALUE is a string containing a metric value.  It may be
 formatted as a number (10.21) or a duration (10:21). Hours are
 optional for duration values."
-  (cond((string-match "^\\(?:\\([[:digit:]]\\{1,2\\}\\):\\)?\\([[:digit:]]\\{2\\}\\):\\([[:digit:]]\\{2\\}\\(?:\\.[[:digit:]]*\\)?\\)$" string-value) ; duration as hh:mm:ss.ms
+  (cond ((string-match "^\\(?:\\([[:digit:]]\\{1,2\\}\\):\\)?\\([[:digit:]]\\{2\\}\\):\\([[:digit:]]\\{2\\}\\(?:\\.[[:digit:]]*\\)?\\)$" string-value) ; duration as hh:mm:ss.ms
          (let ((h (if (match-string 1 string-value) (string-to-int (match-string 1 string-value)) 0))
                (m (string-to-int (match-string 2 string-value)))
                (s (string-to-number (match-string 3 string-value))))
@@ -278,7 +278,7 @@ This reads the diary file."
   "Look up the valid value-transforms for the given DATE-GROUPING."
   (plist-get metrics-tracker-grouping-and-transform-options date-grouping))
 
-(defvar metrics-tracker-graph-options '(line bar scatter)
+(defvar metrics-tracker-graph-options '(line bar stacked scatter)
   "The types of supported graphs.")
 
 (defvar metrics-tracker-graph-output-options '(ascii svg png)
@@ -718,7 +718,7 @@ FNAME is the filename of the temp file to write."
                            "full"
                          (format-time-string (metrics-tracker--format-bin date-grouping) date)))
         (setq data (cons (append (list date-str)
-                                 (mapcar (lambda (bin-data) (gethash date bin-data ".")) bin-data-all))
+                                 (mapcar (lambda (bin-data) (gethash date bin-data "0")) bin-data-all))
                          data)))
       (setq data (reverse data))
       (setq num-lines (1- (length (car data)))))
@@ -739,12 +739,14 @@ FNAME is the filename of the temp file to write."
     (cond ((eq graph-type 'line)
            (insert "set xdata time\n")
            (insert "set xtics rotate\n"))
-          ((eq graph-type 'bar)
+          ((or (eq graph-type 'bar)
+               (eq graph-type 'stacked))
            (insert "set xtics rotate\n")
            (insert "set boxwidth 0.9 relative\n")
            (insert "set yrange [0:]\n")
            (insert "set style data histogram\n")
-           (insert "set style histogram cluster\n")
+           (insert (format "set style histogram %s\n"
+                           (if (eq graph-type 'bar) "cluster" "rowstacked")))
            (insert "set style fill solid\n"))
           ((eq graph-type 'scatter)
            (insert "set xdata time\n")
@@ -772,7 +774,8 @@ METRIC-NAMES is the list of metric names being plotted."
          ((eq graph-type 'line)
           (setq plot-def (concat plot-def (format " \"%s\" using 1:%d with lines %s lt %s lw 1.2 lc rgbcolor \"%s\"%s"
                                                   dash (+ ii 2) label (1+ ii) (nth ii metrics-tracker-graph-colors) comma))))
-         ((eq graph-type 'bar)
+         ((or (eq graph-type 'bar)
+              (eq graph-type 'stacked))
           (setq plot-def (concat plot-def (format " \"%s\" using %d:xtic(1) %s lc rgbcolor \"%s\"%s"
                                                   dash (+ ii 2) label (nth ii metrics-tracker-graph-colors) comma))))
          ((eq graph-type 'scatter)

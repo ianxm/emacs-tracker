@@ -261,6 +261,7 @@ Jan 4, 2020 run dist 2
     - graph-type :: the type of graph to render. one of:
       - line
       - bar
+      - stacked
       - scatter
     - graph-output :: display format for the graph. one of:
       - ascii
