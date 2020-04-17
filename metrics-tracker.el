@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.1.4
+;; Version: 0.1.5
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -373,8 +373,6 @@ days within the bin and inside of FIRST-DATE and LAST-DATE."
                             bin-date first-date today)
   "Transform and format the bin VALUE into the value used in reporting.
 
-Returns the bin value as a string.
-
 The VALUE-TRANSFORM and DATE-GROUPING are needed to determine how
 to transform the value.  BIN-DATE, FIRST-DATE, TODAY are all
 needed to determine the number of days in the current bin."
@@ -388,29 +386,30 @@ needed to determine the number of days in the current bin."
     (cond
      ((or (eq value-transform 'total)
           (eq value-transform 'diff-total))
-      (format "%s" (/ (round (* value 100)) 100.0))) ; round to two decimal places
+      value)
 
-     ((eq value-transform 'count) (format "%d" value))
+     ((eq value-transform 'count)
+      value)
 
      ((or (eq value-transform 'percent)
           (eq value-transform 'diff-percent))
-      (format "%.1f" (* (/ value bin-duration) 100)))
+      (* (/ value bin-duration) 100))
 
      ((or (eq value-transform 'per-day)
           (eq value-transform 'diff-per-day))
-      (format "%.1f" (* value (/ 1 bin-duration))))
+      (* value (/ 1 bin-duration)))
 
      ((or (eq value-transform 'per-week)
           (eq value-transform 'diff-per-week))
-      (format "%.1f" (* value (/ 7 bin-duration))))
+      (* value (/ 7 bin-duration)))
 
      ((or (eq value-transform 'per-month)
           (eq value-transform 'diff-per-month))
-      (format "%.1f" (* value (/ 30 bin-duration))))
+      (* value (/ 30 bin-duration)))
 
      ((or (eq value-transform 'per-year)
           (eq value-transform 'diff-per-year))
-      (format "%.1f" (* value (/ 365 bin-duration)))))))
+      (* value (/ 365 bin-duration))))))
 
 (defun metrics-tracker--bin-metric-data (metric-name date-grouping value-transform today &optional allow-gaps-p)
   "Read the requested metric data from the diary.
@@ -441,14 +440,18 @@ ALLOW-GAPS-P is t, don't fill in gaps."
                                                     'full first-date today)
                  bin-data)
       (let* ((current-date-bin first-date-bin)
-             (last-value (gethash current-date-bin bin-data)) ; the value from the last bin we visited
+             (last-value (metrics-tracker--bin-to-val (gethash current-date-bin bin-data)
+                                                      value-transform date-grouping
+                                                      current-date-bin first-date today)) ; the value from the last bin we visited
              current-value                                    ; the value from the bin we're currently visiting
              write-value)                                     ; the value to write for the current bin
         (while (or (time-less-p current-date-bin today-bin)
                    (equal current-date-bin today-bin))
           (when (or (gethash current-date-bin bin-data)
                     (not allow-gaps-p))
-            (setq current-value (gethash current-date-bin bin-data 0))
+            (setq current-value (metrics-tracker--bin-to-val (gethash current-date-bin bin-data 0)
+                                                             value-transform date-grouping
+                                                             current-date-bin first-date today))
             (if (or (eq value-transform 'diff-total)
                     (eq value-transform 'diff-percent)
                     (eq value-transform 'diff-per-day)
@@ -457,10 +460,10 @@ ALLOW-GAPS-P is t, don't fill in gaps."
                     (eq value-transform 'diff-per-year))
                 (setq write-value (- current-value last-value)) ; apply diff
               (setq write-value current-value))
-            (puthash current-date-bin (metrics-tracker--bin-to-val write-value
-                                                  value-transform date-grouping
-                                                  current-date-bin first-date today)
-                     bin-data))
+
+            (puthash current-date-bin
+                     (format "%s" (/ (round (* write-value 100)) 100.0))
+                     bin-data)) ; replace number with a string
           (setq last-value current-value
                 current-date-bin (metrics-tracker--date-to-next-bin current-date-bin date-grouping))))) ; increment to next bin
     bin-data))
