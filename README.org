@@ -171,13 +171,19 @@ Jan 4, 2020 run dist 2
       - year
       - full
     - value-transform :: how to transform the data. one of:
-      - total :: sum all of the values in the bin
-      - count :: count entries in the bin
+      - total :: sum all of the values in the ~date-grouping~
+      - count :: count entries in the ~date-grouping~
       - percent :: percent of days within the ~date-grouping~ with an occurrence
-      - per-day :: divide the bin total by the number of days in the bin
-      - per-week :: divide the bin total by the number of weeks in the bin
-      - per-month :: divide the bin total by the number of months in the bin
-      - per-year :: divide the bin total by the number of years in the bin
+      - per-day :: divide the ~date-grouping~ total by the number of days in the ~date-grouping~
+      - per-week :: divide the ~date-grouping~ total by the number of weeks in the ~date-grouping~
+      - per-month :: divide the ~date-grouping~ total by the number of months in the ~date-grouping~
+      - per-year :: divide the ~date-grouping~ total by the number of years in the ~date-grouping~
+      - diff-total :: the difference of ~total~ from one ~date-grouping~ to the next
+      - diff-percent :: the difference of ~percent~ from one ~date-grouping~ to the next
+      - diff-per-day :: the difference of ~per-day~ from one ~date-grouping~ to the next
+      - diff-per-week :: the difference of ~per-week~ from one ~date-grouping~ to the next
+      - diff-per-month :: the difference of ~per-month~ from one ~date-grouping~ to the next
+      - diff-per-year :: the difference of ~per-year~ from one ~date-grouping~ to the next
 
     this creates a table containing the transformed data for the
     requested metric.
@@ -218,7 +224,7 @@ Jan 4, 2020 run dist 2
 
     emacs can extract the data for a metric and render it onto a
     calendar.  the number at each calendar position is one of:
-    - period :: no metric for the day
+    - period :: no metric was recorded on this day
     - underscore :: before first metric occurrence or after current
                     date
     - number :: the value for the day

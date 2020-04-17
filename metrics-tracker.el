@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.1.3
+;; Version: 0.1.4
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -92,6 +92,11 @@ the diary file to be re-read if the data is needed again.")
   "Return the later of the given dates D1 and D2."
   `(if (time-less-p ,d1 ,d2) ,d2 ,d1))
 
+(defun metrics-tracker--today ()
+  "Return a time value for today.  This is the current day with the time values zeroed out."
+  (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                               (seq-take (parse-time-string (format-time-string "%F")) 6))))
+
 (defun metrics-tracker--process-diary (filter action)
   "Parse the diary file.
 For each valid metrics entry found, parse the fields and then
@@ -137,8 +142,8 @@ STRING-VALUE is a string containing a metric value.  It may be
 formatted as a number (10.21) or a duration (10:21). Hours are
 optional for duration values."
   (cond ((string-match "^\\(?:\\([[:digit:]]\\{1,2\\}\\):\\)?\\([[:digit:]]\\{2\\}\\):\\([[:digit:]]\\{2\\}\\(?:\\.[[:digit:]]*\\)?\\)$" string-value) ; duration as hh:mm:ss.ms
-         (let ((h (if (match-string 1 string-value) (string-to-int (match-string 1 string-value)) 0))
-               (m (string-to-int (match-string 2 string-value)))
+         (let ((h (if (match-string 1 string-value) (string-to-number (match-string 1 string-value)) 0))
+               (m (string-to-number (match-string 2 string-value)))
                (s (string-to-number (match-string 3 string-value))))
            (+ h (/ m 60.0) (/ s 3600.0)))) ; return duration in hours
         ((string-match "^[[:digit:]\.]+$" string-value) ; number like 10.21
@@ -175,8 +180,7 @@ This reads the diary file and populated in
   (unless metrics-tracker-metric-index
     (let* (metrics ; will contain plist of metric-name -> (metric-name count first last daysago)
            existing-metric
-           (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
-                                               (seq-take (parse-time-string (format-time-string "%F")) 6))))
+           (today (metrics-tracker--today))
            (list-filter-fcn (cond ((not (null metrics-tracker-metric-name-whitelist))
                                    (lambda (_date name) ; filter out non-whitelisted metrics
                                      (seq-contains metrics-tracker-metric-name-whitelist (symbol-name name))))
@@ -244,7 +248,7 @@ This reads the diary file."
   (setq-local tabulated-list-padding 2)
   (setq-local tabulated-list-sort-key (cons "days ago" nil))
 
-  ;; set data
+  ;; populate the table data
   (let (data)
     (dolist (metric metrics-tracker-metric-index)
       (setq data (cons (list (symbol-name (nth 0 metric))
@@ -264,10 +268,10 @@ This reads the diary file."
 
 (defvar metrics-tracker-grouping-and-transform-options
   '(day (total count)
-        week (total count percent per-day)
-        month (total count percent per-day per-week)
-        year (total count percent per-day per-week per-month)
-        full (total count percent per-day per-week per-month per-year))
+        week (total count percent per-day diff-total diff-percent diff-per-day)
+        month (total count percent per-day per-week diff-total diff-percent diff-per-day diff-per-week)
+        year (total count percent per-day per-week per-month diff-total diff-percent diff-per-day diff-per-week diff-per-month)
+        full (total count percent per-day per-week per-month per-year diff-total diff-percent diff-per-day diff-per-week diff-per-month diff-per-year))
   "This is a plist of date-grouping options mapped to value-transform options.")
 
 (defun metrics-tracker--date-grouping-options ()
@@ -329,7 +333,8 @@ This reads the diary file."
 Either save the total value or a count of occurrences."
   (cond
    ((eq value-transform 'count) 1)
-   ((eq value-transform 'percent) 1)
+   ((or (eq value-transform 'percent)
+        (eq value-transform 'diff-percent)) 1)
    (t value)))
 
 (defun metrics-tracker--format-bin (date-grouping)
@@ -368,6 +373,8 @@ days within the bin and inside of FIRST-DATE and LAST-DATE."
                             bin-date first-date today)
   "Transform and format the bin VALUE into the value used in reporting.
 
+Returns the bin value as a string.
+
 The VALUE-TRANSFORM and DATE-GROUPING are needed to determine how
 to transform the value.  BIN-DATE, FIRST-DATE, TODAY are all
 needed to determine the number of days in the current bin."
@@ -379,13 +386,31 @@ needed to determine the number of days in the current bin."
                        ((eq date-grouping 'full) (float (- (time-to-days today)
                                                            (time-to-days first-date)))))))
     (cond
-     ((eq value-transform 'total) (format "%.2f" value))
+     ((or (eq value-transform 'total)
+          (eq value-transform 'diff-total))
+      (format "%s" (/ (round (* value 100)) 100.0))) ; round to two decimal places
+
      ((eq value-transform 'count) (format "%d" value))
-     ((eq value-transform 'percent) (format "%.1f" (* (/ value bin-duration) 100)))
-     ((eq value-transform 'per-day) (format "%.1f" (* value (/ 1 bin-duration))))
-     ((eq value-transform 'per-week) (format "%.1f" (* value (/ 7 bin-duration))))
-     ((eq value-transform 'per-month) (format "%.1f" (* value (/ 30 bin-duration))))
-     ((eq value-transform 'per-year) (format "%.1f" (* value (/ 365 bin-duration)))))))
+
+     ((or (eq value-transform 'percent)
+          (eq value-transform 'diff-percent))
+      (format "%.1f" (* (/ value bin-duration) 100)))
+
+     ((or (eq value-transform 'per-day)
+          (eq value-transform 'diff-per-day))
+      (format "%.1f" (* value (/ 1 bin-duration))))
+
+     ((or (eq value-transform 'per-week)
+          (eq value-transform 'diff-per-week))
+      (format "%.1f" (* value (/ 7 bin-duration))))
+
+     ((or (eq value-transform 'per-month)
+          (eq value-transform 'diff-per-month))
+      (format "%.1f" (* value (/ 30 bin-duration))))
+
+     ((or (eq value-transform 'per-year)
+          (eq value-transform 'diff-per-year))
+      (format "%.1f" (* value (/ 365 bin-duration)))))))
 
 (defun metrics-tracker--bin-metric-data (metric-name date-grouping value-transform today &optional allow-gaps-p)
   "Read the requested metric data from the diary.
@@ -409,22 +434,35 @@ ALLOW-GAPS-P is t, don't fill in gaps."
 
     (metrics-tracker--process-diary table-filter-fcn table-action-fcn)
 
-    ;; fill gaps
-    (unless (or (eq date-grouping 'full)
-                allow-gaps-p)
-      (let ((current-date-bin first-date-bin))
-        (while (time-less-p current-date-bin today-bin)
-          (setq current-date-bin (metrics-tracker--date-to-next-bin current-date-bin date-grouping)) ; increment to next bin
-          (unless (gethash current-date-bin bin-data)
-            (puthash current-date-bin 0 bin-data)))))
-
-    ;; apply the value transform to the hashtable values
-    (maphash (lambda (date bin)
-               (puthash date
-                        (metrics-tracker--bin-to-val bin value-transform date-grouping
-                                                          date first-date today)
-                        bin-data))
-             bin-data)
+    ;; fill gaps and apply value transforms
+    (if (eq date-grouping 'full)
+        (puthash 'full (metrics-tracker--bin-to-val (gethash 'full bin-data)
+                                                    value-transform date-grouping
+                                                    'full first-date today)
+                 bin-data)
+      (let* ((current-date-bin first-date-bin)
+             (last-value (gethash current-date-bin bin-data)) ; the value from the last bin we visited
+             current-value                                    ; the value from the bin we're currently visiting
+             write-value)                                     ; the value to write for the current bin
+        (while (or (time-less-p current-date-bin today-bin)
+                   (equal current-date-bin today-bin))
+          (when (or (gethash current-date-bin bin-data)
+                    (not allow-gaps-p))
+            (setq current-value (gethash current-date-bin bin-data 0))
+            (if (or (eq value-transform 'diff-total)
+                    (eq value-transform 'diff-percent)
+                    (eq value-transform 'diff-per-day)
+                    (eq value-transform 'diff-per-week)
+                    (eq value-transform 'diff-per-month)
+                    (eq value-transform 'diff-per-year))
+                (setq write-value (- current-value last-value)) ; apply diff
+              (setq write-value current-value))
+            (puthash current-date-bin (metrics-tracker--bin-to-val write-value
+                                                  value-transform date-grouping
+                                                  current-date-bin first-date today)
+                     bin-data))
+          (setq last-value current-value
+                current-date-bin (metrics-tracker--date-to-next-bin current-date-bin date-grouping))))) ; increment to next bin
     bin-data))
 
 (defun metrics-tracker--setup-output-buffer ()
@@ -483,8 +521,7 @@ If ARG is given, allow selection of multiple metrics."
   (metrics-tracker--load-index)
 
   (let* ((ivy-sort-functions-alist nil)
-         (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
-                                             (seq-take (parse-time-string (format-time-string "%F")) 6))))
+         (today (metrics-tracker--today))
          ;; ask for params
          (multp (not (null arg)))
          (metric-names-str (metrics-tracker--ask-for-metrics multp))
@@ -561,8 +598,7 @@ If ARG is given, allow selection of multiple metrics."
 
   (let* ((ivy-sort-functions-alist nil)
          (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
-         (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
-                                             (seq-take (parse-time-string (format-time-string "%F")) 6))))
+         (today (metrics-tracker--today))
          ;; ask for params
          (metric-name-str (completing-read "Metric: " (metrics-tracker--presorted-options all-metric-names) nil t))
          (metric-name (intern metric-name-str metrics-tracker-metric-names))
@@ -632,8 +668,7 @@ If ARG is given, allow selection of multiple metrics."
   (metrics-tracker--load-index)
 
   (let* ((ivy-sort-functions-alist nil)
-         (today (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
-                                             (seq-take (parse-time-string (format-time-string "%F")) 6))))
+         (today (metrics-tracker--today))
          ;; ask for params
          (multp (not (null arg)))
          (metric-names-str (metrics-tracker--ask-for-metrics multp))
@@ -735,7 +770,8 @@ FNAME is the filename of the temp file to write."
     (when date-format ; not 'full
       (insert (format "set timefmt \"%s\"\n" date-format))
       (insert (format "set format x \"%s\"\n" date-format)))
-    (insert (format "set ylabel \"%s\"\n" value-transform))
+    (insert (format "set ylabel \"%s\"\n"
+                    (replace-regexp-in-string "-" " " (symbol-name value-transform))))
     (cond ((eq graph-type 'line)
            (insert "set xdata time\n")
            (insert "set xtics rotate\n"))
@@ -743,7 +779,6 @@ FNAME is the filename of the temp file to write."
                (eq graph-type 'stacked))
            (insert "set xtics rotate\n")
            (insert "set boxwidth 0.9 relative\n")
-           (insert "set yrange [0:]\n")
            (insert "set style data histogram\n")
            (insert (format "set style histogram %s\n"
                            (if (eq graph-type 'bar) "cluster" "rowstacked")))
