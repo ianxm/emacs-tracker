@@ -278,26 +278,24 @@ Jan 4, 2020 run dist 2
     commute miles per week for each year:
 
 #+BEGIN_SRC org-mode
-:                                commute per week
 :
-:  45 +-+-++++-++++-++++-++++-++++-++++-++++-++++-++++-++++-++++-++++-+++++-+
-:     +   +     +    +    +         +         +         +         +         +
-:  40 +-++            +             +...                                  +-+
-:     | +              +           .    .                                   |
-:  35 +-+               +        ..      +                                +-+
-:     |                  +      .         :                                 |
-:  30 +-+                 +....+          :                               +-+
-:     |                                    :           .+                   |
-:     |                                     :        ..  :                  |
-:  25 +-+                                    :    .+.     :               +-+
-:     |                                      :  ..         :                |
-:  20 +-+                                     +.           :              +-+
-:     |                                                     :               |
-:  15 +-+                                                    +....+....   +-+
-:     +         +         +         +         +         +         +    +    +
-:  10 +-+-++++-++++-++++-++++-++++-++++-++++-++++-++++-++++-++++-++++-+++++-+
-:   2006      2008      2010      2012      2014      2016      2018      2020
-:                                      year
+:                                  commute per week
+:
+:          50 +-+.....+........+.......+........+.......+........+.......+
+:          45 |-+.****:........:.......:........:.......:........+.......:
+:             |  *    *******  :       ****     :       :        :       :
+:          40 |-*.....:......**:.....**:...*....:.......:........:.......:
+:          35 |*+.....:........:....*..:....*...:.......:........:.......:
+:          30 *-+.....:........*****...:.....*..:.......:........:.......:
+:             |       :        :       :      * :     ***        :       :
+:          25 |-+.....:........:.......:.......*:.****..:*.......:.......:
+:          20 |-+.....:........:.......:........**......:.*......:.......:
+:             |       :        :       :        :       :  *     :       :
+:          15 |-+.....+........+.......+........+.......+...*********..***
+:          10 +------------------------------------------------------**--+
+:           2006    2008     2010    2012     2014    2016     2018    2020
+:                                        year
+:
 #+END_SRC
 
     below is an example of the same data but this one shows the total
@@ -320,8 +318,8 @@ Jan 4, 2020 run dist 2
     the same axis. all other plot options are the same as in the
     single metric case.
 
-    this example shows the percentage of days I bike commuted versus
-    ran by year:
+    this example shows the percentage of days I bike commuted or
+    ran by year, with dark mode enabled:
 
     [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/commute_run_by_year.png]]
 
@@ -329,12 +327,20 @@ Jan 4, 2020 run dist 2
     using the ~metrics-tracker-graph-colors~ custom variable, which
     contains a list of colors specified as hex values.
 
+** customization
+
+    metrics-tracker.el defines several variables that can be used to customize behavior.
+
+    - metrics-tracker-dark-mode :: if ~t~, enable dark mode for image graphs
+    - metrics-tracker-graph-colors :: two lists of colors to use for graph series in light mode and dark mode
+    - metrics-tracker-metric-name-whitelist :: if given, read only these metrics when parsing the diary file
+    - metrics-tracker-metric-name-blacklist :: if given, ignore these metrics when parsing the diary file
+
 ** todo
    - reports
      - streaks
      - bursts
      - records
    - combine multiple metrics with formulas
-   - dark mode for graphs
    - sync to cloud
    - quality checks

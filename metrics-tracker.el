@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.1.5
+;; Version: 0.1.6
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -62,9 +62,16 @@ For example: '(\"pushups\" \"situps\")"
   :type '(list :inline t string)
   :group 'metrics-tracker)
 
-(defcustom metrics-tracker-graph-colors '("#1f77b4" "#ff7f0e" "#2ca02c" "#d62728" "#9467bd" "#8c564b" "#e377c2" "#7f7f7f" "#bcbd22" "#17becf")
-  "Colors to use for each series in graphs."
-  :type '(list :inline t string)
+(defcustom metrics-tracker-graph-colors '(("#1f77b4" "#ff7f0e" "#2ca02c" "#d62728" "#9467bd" "#8c564b" "#e377c2" "#7f7f7f" "#bcbd22" "#17becf")
+                                          ("#4d871a" "#81871a" "#87581a" "#1a5a87" "#761a87" "#871a1a" "#833a3a" "#403a83" "#3a7f83" "#83743a"))
+  "Colors to use for each series in graphs.  The first list is used when in light mode; the second list for dark mode."
+  :type '(list (list :inline t string)  ; light mode colors
+               (list :inline t string)) ; dark mode colors
+  :group 'metrics-tracker)
+
+(defcustom metrics-tracker-dark-mode nil
+  "If \"t\", generate graph images with dark backgrounds."
+  :type 'boolean
   :group 'metrics-tracker)
 
 (defvar metrics-tracker-metric-index nil
@@ -266,7 +273,7 @@ This reads the diary file."
 
   (metrics-tracker--show-output-buffer))
 
-(defvar metrics-tracker-grouping-and-transform-options
+(defconst metrics-tracker-grouping-and-transform-options
   '(day (total count)
         week (total count percent per-day diff-total diff-percent diff-per-day)
         month (total count percent per-day per-week diff-total diff-percent diff-per-day diff-per-week)
@@ -279,14 +286,34 @@ This reads the diary file."
   (seq-filter (lambda (x) (symbolp x)) metrics-tracker-grouping-and-transform-options))
 
 (defun metrics-tracker--value-transform-options (date-grouping)
-  "Look up the valid value-transforms for the given DATE-GROUPING."
+  "Return the valid value-transforms for the given DATE-GROUPING."
   (plist-get metrics-tracker-grouping-and-transform-options date-grouping))
 
-(defvar metrics-tracker-graph-options '(line bar stacked scatter)
+(defconst metrics-tracker-graph-options '(line bar stacked scatter)
   "The types of supported graphs.")
 
-(defvar metrics-tracker-graph-output-options '(ascii svg png)
+(defun metrics-tracker--graph-options-for-graphs (date-transform)
+  "Return the valid graph-options for the given DATE-TRANSFORM.
+This only needs to be done for graphs, since line and scatter
+graphs don't work if there's just one data point."
+  (if (eq date-transform 'full)
+      (seq-difference metrics-tracker-graph-options '(line scatter))
+    metrics-tracker-graph-options))
+
+(defconst metrics-tracker-graph-output-options '(ascii svg png)
   "The graph output options.")
+
+(defun metrics-tracker--presorted-options (options)
+  "Prevent Emacs from sorting OPTIONS.
+For some reason some versions of Emacs sort the given options instead of just
+presenting them.  Solution taken from:
+https://emacs.stackexchange.com/questions/41801/how-to-stop-completing-read-ivy-completing-read-from-sorting"
+  (lambda (string pred action)
+    (if (eq action 'metadata)
+        '(metadata (display-sort-function . identity)
+                   (cycle-sort-function . identity))
+      (complete-with-action
+       action options string pred))))
 
 (defun metrics-tracker--date-to-bin (date date-grouping)
   "Return the start date of the bin containing DATE of size DATE-GROUPING."
@@ -435,10 +462,12 @@ ALLOW-GAPS-P is t, don't fill in gaps."
 
     ;; fill gaps and apply value transforms
     (if (eq date-grouping 'full)
-        (puthash 'full (metrics-tracker--bin-to-val (gethash 'full bin-data)
-                                                    value-transform date-grouping
-                                                    'full first-date today)
-                 bin-data)
+        (let ((write-value (gethash 'full bin-data)))
+          (puthash 'full
+                   (metrics-tracker--bin-to-val (format "%s" (/ (round (* write-value 100)) 100.0))
+                                                value-transform date-grouping
+                                                'full first-date today)
+                   bin-data))
       (let* ((current-date-bin first-date-bin)
              (last-value (metrics-tracker--bin-to-val (gethash current-date-bin bin-data)
                                                       value-transform date-grouping
@@ -485,18 +514,6 @@ ALLOW-GAPS-P is t, don't fill in gaps."
   "Check if gnuplot is installed on the system."
   (unless (eq 0 (call-process-shell-command "gnuplot --version"))
     (error "Cannot find gnuplot")))
-
-(defun metrics-tracker--presorted-options (options)
-  "Prevent Emacs from sorting OPTIONS.
-For some reason some versions of Emacs sort the given options instead of just
-presenting them.  Solution taken from:
-https://emacs.stackexchange.com/questions/41801/how-to-stop-completing-read-ivy-completing-read-from-sorting"
-  (lambda (string pred action)
-    (if (eq action 'metadata)
-        '(metadata (display-sort-function . identity)
-                   (cycle-sort-function . identity))
-      (complete-with-action
-       action options string pred))))
 
 (defun metrics-tracker--ask-for-metrics (multp)
   "Prompt for metric names.
@@ -682,8 +699,9 @@ If ARG is given, allow selection of multiple metrics."
          (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
                                                                         (metrics-tracker--value-transform-options date-grouping))
                                                    nil t nil nil "total")))
-         (graph-type (intern (completing-read "Graph type: " (metrics-tracker--presorted-options metrics-tracker-graph-options)
-                                              nil t nil nil "line")))
+         (graph-type (intern (completing-read "Graph type: " (metrics-tracker--presorted-options
+                                                              (metrics-tracker--graph-options-for-graphs date-grouping))
+                                              nil t)))
          (graph-output (intern (completing-read "Graph output: " (metrics-tracker--presorted-options
                                                                   metrics-tracker-graph-output-options)
                                                 nil t nil nil "ascii")))
@@ -740,7 +758,9 @@ FNAME is the filename of the temp file to write."
                     (t "dumb")))
         (width (if (eq graph-output 'ascii) (1- (window-width)) (car metrics-tracker-graph-size)))
         (height (if (eq graph-output 'ascii) (1- (window-height)) (cdr metrics-tracker-graph-size)))
-        (title (if (= 1 (length metric-names)) (car metric-names) "")))
+        (title (if (= 1 (length metric-names)) (car metric-names) ""))
+        (fg-color (if metrics-tracker-dark-mode "grey50" "grey10"))
+        (bg-color (if metrics-tracker-dark-mode "grey10" "grey90")))
 
     ;; merge dates and sort
     (setq merged-dates (seq-reduce (lambda (dates ii) (append (hash-table-keys ii) dates))
@@ -750,13 +770,14 @@ FNAME is the filename of the temp file to write."
     (setq merged-dates (metrics-tracker--sort-dates merged-dates))
 
     ;; set table data
-    (let (date-str)
+    (let ((default (if (or (eq graph-type 'line) (eq graph-type 'scatter)) "." "0"))
+          date-str)
       (dolist (date merged-dates)
         (setq date-str (if (eq date-grouping 'full)
                            "full"
                          (format-time-string (metrics-tracker--format-bin date-grouping) date)))
         (setq data (cons (append (list date-str)
-                                 (mapcar (lambda (bin-data) (gethash date bin-data "0")) bin-data-all))
+                                 (mapcar (lambda (bin-data) (gethash date bin-data default)) bin-data-all))
                          data)))
       (setq data (reverse data))
       (setq num-lines (1- (length (car data)))))
@@ -766,18 +787,28 @@ FNAME is the filename of the temp file to write."
            (insert (format "set title \"%s %s\"\n" title
                            (replace-regexp-in-string "-" " " (symbol-name value-transform)))))
           (t ; output an image
-           (insert (format "set term %s size %d, %d background rgb \"gray90\"\n\n" term width height))
-           (insert (format "set title \"%s\"\n" title))
+           (insert (format "set term %s size %d, %d background rgb \"%s\"\n\n" term width height bg-color))
+           (insert (format "set xtics tc rgb \"%s\"\n" fg-color))
+           (insert (format "set title \"%s\" tc rgb \"%s\"\n" title fg-color))
            (insert (format "set output \"%s\"\n" fname))))
-    (insert (format "set xlabel \"%s\"\n" date-grouping))
+    (insert "set tics nomirror\n")
+    (insert "set xzeroaxis\n")
+    (insert (format "set border 3 back ls -1 lc rgb \"%s\"\n" fg-color))
+    (insert (format "set xlabel \"%s\" tc rgb \"%s\"\n" date-grouping fg-color))
+    (insert (format "set key tc rgb \"%s\"\n" fg-color))
     (when date-format ; not 'full
       (insert (format "set timefmt \"%s\"\n" date-format))
       (insert (format "set format x \"%s\"\n" date-format)))
-    (insert (format "set ylabel \"%s\"\n"
-                    (replace-regexp-in-string "-" " " (symbol-name value-transform))))
-    (cond ((eq graph-type 'line)
+    (insert (format "set ylabel \"%s\" tc rgb \"%s\"\n"
+                    (replace-regexp-in-string "-" " " (symbol-name value-transform))
+                    fg-color))
+    (cond ((or (eq graph-type 'line)
+               (eq graph-type 'scatter))
            (insert "set xdata time\n")
-           (insert "set xtics rotate\n"))
+           (insert (format "set xrange [\"%s\":\"%s\"]\n" (caar data) (caar (last data))))
+           (insert "set xtics rotate\n")
+           (insert (format "set grid back ls 0 lc \"%s\"\n" fg-color))
+           (insert "set pointsize 0.5\n"))
           ((or (eq graph-type 'bar)
                (eq graph-type 'stacked))
            (insert "set xtics rotate\n")
@@ -785,25 +816,26 @@ FNAME is the filename of the temp file to write."
            (insert "set style data histogram\n")
            (insert (format "set style histogram %s\n"
                            (if (eq graph-type 'bar) "cluster" "rowstacked")))
-           (insert "set style fill solid\n"))
-          ((eq graph-type 'scatter)
-           (insert "set xdata time\n")
-           (insert "set xtics rotate\n")
-           (insert "set style line 1 pt 7 ps 0.5\n")))
-    (insert (metrics-tracker--define-plot graph-type num-lines metric-names) "\n")
+           (insert "set style fill solid\n")
+           (insert (format "set grid ytics back ls 0 lc \"%s\"\n" fg-color))
+           (if (eq graph-type 'stacked)
+               (insert "set key invert\n"))))
+    (insert (metrics-tracker--define-plot graph-type graph-output num-lines metric-names) "\n")
     (dotimes (_ii num-lines)
-      (if (not date-format)
-          (insert (format ". %s\n" (cdar data)))
+      (if (not date-format) ; is 'full
+          (insert (format ". %s\n" (mapconcat #'identity (cdar data) " ")))
         (dolist (entry data)
           (insert (concat (mapconcat #'identity entry " ") "\n"))))
       (insert "\ne\n"))))
 
-(defun metrics-tracker--define-plot (graph-type num-lines metric-names)
+(defun metrics-tracker--define-plot (graph-type graph-output num-lines metric-names)
   "Return the plot definition command.
-GRAPH-TYPE is line, bar, point
+GRAPH-TYPE is one of line, bar, point
+GRAPH-OUTPUT is one of ascii, svg, png
 NUM-LINES is the number of lines to include in the plot.
 METRIC-NAMES is the list of metric names being plotted."
-  (let ((plot-def "plot"))
+  (let ((plot-def "plot")
+        (colors (nth (if metrics-tracker-dark-mode 1 0) metrics-tracker-graph-colors)))
     (dotimes (ii num-lines)
       (let ((dash (if (= 0 ii) "-" ""))
             (label (if (= 1 num-lines) "notitle" (format "title \"%s\"" (nth ii metric-names))))
@@ -811,14 +843,20 @@ METRIC-NAMES is the list of metric names being plotted."
         (cond
          ((eq graph-type 'line)
           (setq plot-def (concat plot-def (format " \"%s\" using 1:%d with lines %s lt %s lw 1.2 lc rgbcolor \"%s\"%s"
-                                                  dash (+ ii 2) label (1+ ii) (nth ii metrics-tracker-graph-colors) comma))))
+                                                  dash (+ ii 2) label (1+ ii) (nth ii colors) comma))))
          ((or (eq graph-type 'bar)
               (eq graph-type 'stacked))
           (setq plot-def (concat plot-def (format " \"%s\" using %d:xtic(1) %s lc rgbcolor \"%s\"%s"
-                                                  dash (+ ii 2) label (nth ii metrics-tracker-graph-colors) comma))))
+                                                  dash (+ ii 2) label (nth ii colors) comma))))
          ((eq graph-type 'scatter)
-          (setq plot-def (concat plot-def (format " \"%s\" using 1:%d with points %s lc rgbcolor \"%s\"%s"
-                                                  dash (+ ii 2) label (nth ii metrics-tracker-graph-colors) comma)))))))
+          (setq plot-def (concat plot-def (format " \"%s\" using 1:%d with points %s lt %d %s lc rgbcolor \"%s\"%s"
+                                                  dash (+ ii 2) label
+                                                  ; set pointtype to capital letters for ascii or dots for images
+                                                  (if (eq graph-output 'ascii) (1+ ii) 7)
+                                                  ; but override pointtype to '*' for ascii plots with one metric
+                                                  (if (and (eq graph-output 'ascii)
+                                                           (= num-lines 1)) "pt \"*\"" "")
+                                                  (nth ii colors) comma)))))))
     plot-def))
 
 (provide 'metrics-tracker)
