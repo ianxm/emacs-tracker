@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.1.6
+;; Version: 0.1.7
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -85,6 +85,9 @@ the diary file to be re-read if the data is needed again.")
 
 (defvar metrics-tracker-metric-names (make-vector 5 0)
   "This is an obarray of all existing metric names.")
+
+(defvar metrics-tracker-last-report-config nil
+  "This holds the configuration of the last report that was rendered.")
 
 (defconst metrics-tracker-output-buffer-name "*Metrics Tracker Output*"
   "The name of the output buffer.")
@@ -231,6 +234,12 @@ This reads the diary file and populated in
   "Sort a list of DATES."
   `(sort ,dates (lambda (a b) (time-less-p a b))))
 
+(defmacro metrics-tracker--validate-input (variable choice options)
+  "Validate that VARIABLE was set to a CHOICE that is among the valid OPTIONS."
+  `(if (not (seq-contains ,options ,choice))
+       (error (concat ,variable " must be one of: " (mapconcat #'symbol-name ,options ", ")))
+     t))
+
 ;;;###autoload
 (defun metrics-tracker-list ()
   "Display a list of all saved metrics in the output buffer.
@@ -292,7 +301,7 @@ This reads the diary file."
 (defconst metrics-tracker-graph-options '(line bar stacked scatter)
   "The types of supported graphs.")
 
-(defun metrics-tracker--graph-options-for-graphs (date-transform)
+(defun metrics-tracker--graph-options (date-transform)
   "Return the valid graph-options for the given DATE-TRANSFORM.
 This only needs to be done for graphs, since line and scatter
 graphs don't work if there's just one data point."
@@ -533,40 +542,74 @@ If MULTP is false, only ask for one metric, else loop until
 
 ;;;###autoload
 (defun metrics-tracker-table (arg)
-  "Get a tabular view of the requested metric.
-If ARG is given, allow selection of multiple metrics."
+  "Interactive way to get a tabular view of the requested metric.
+ARG is optional, but if given and it is the default argument,
+allow selection of multiple metrics.
+
+This function gets user input and then delegates to
+`metrics-tracker-table-render'."
   (interactive "P")
 
   ;; make sure `metrics-tracker-metric-index' has been populated
   (metrics-tracker--load-index)
 
   (let* ((ivy-sort-functions-alist nil)
-         (today (metrics-tracker--today))
          ;; ask for params
-         (multp (not (null arg)))
+         (multp (equal arg '(4)))
          (metric-names-str (metrics-tracker--ask-for-metrics multp))
-         (metric-names (mapcar (lambda (name) (intern name metrics-tracker-metric-names)) metric-names-str))
-         (date-grouping-str (completing-read "Group dates by: " (metrics-tracker--presorted-options
-                                                                 (metrics-tracker--date-grouping-options))
-                                             nil t nil nil "month"))
-         (date-grouping (intern date-grouping-str))
+         (date-grouping (intern (completing-read "Group dates by: " (metrics-tracker--presorted-options
+                                                                     (metrics-tracker--date-grouping-options))
+                                                 nil t nil nil "month")))
          (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
                                                                         (metrics-tracker--value-transform-options date-grouping))
-                                                   nil t nil nil "total")))
-         ;; load metric data into bins; list of `bin-data' for each metric in the same order as `metric-names'
-         (bin-data-all (mapcar (lambda (metric-name) (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today))
-                               metric-names))
-         merged-dates)
+                                                   nil t nil nil "total"))))
+    (metrics-tracker-table-render (list metric-names-str date-grouping value-transform))))
 
-    ;; merge dates and sort
-    (setq merged-dates (seq-reduce (lambda (dates ii) (append (hash-table-keys ii) dates))
+;;;###autoload
+(defun metrics-tracker-table-render (table-config)
+  "Programmatic way to get a tabular view of the requested metric.
+
+TABLE-CONFIG should be a list of all inputs needed to render a table.
+The first item in the list is a list of metric names.
+The second item is a date grouping.
+The third item is a value transform.
+Metric names are strings but date grouping and value transform
+are symbols.
+
+For example:
+    '((\"metricname\") year total)"
+
+  ;; make sure `metrics-tracker-metric-index' has been populated
+  (metrics-tracker--load-index)
+
+  (let* ((today (metrics-tracker--today))
+         (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
+         (metric-names-str (nth 0 table-config))
+         (metric-names (mapcar (lambda (name) (intern name metrics-tracker-metric-names)) metric-names-str))
+         (date-grouping (nth 1 table-config))
+         (value-transform (nth 2 table-config))
+         bin-data-all merged-dates)
+
+    ;; validate inputs
+    (dolist (metric metric-names t)
+      (metrics-tracker--validate-input "metric" metric all-metric-names))
+    (metrics-tracker--validate-input "date-grouping" date-grouping (metrics-tracker--date-grouping-options))
+    (metrics-tracker--validate-input "value-transform" value-transform (metrics-tracker--value-transform-options date-grouping))
+
+    ;; save the config
+    (setq metrics-tracker-last-report-config table-config)
+
+    ;; load metric data into bins; list of `bin-data' for each metric in the same order as `metric-names'
+    (setq bin-data-all (mapcar (lambda (metric-name) (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today))
+                               metric-names)
+          merged-dates (seq-reduce (lambda (dates ii) (append (hash-table-keys ii) dates))
                                    bin-data-all
                                    nil))
     (delete-dups merged-dates)
     (setq merged-dates (metrics-tracker--sort-dates merged-dates))
 
     (if (and (eq date-grouping 'full)
-             (not multp))
+             (= 1 (length metric-names)))
         ;; if there's only one value to print, just write it to the status line
         (message "Overall %s %s: %s"
                  (car metric-names)
@@ -579,7 +622,7 @@ If ARG is given, allow selection of multiple metrics."
 
       ;; set table headers
       (setq tabulated-list-format
-            (vconcat (list (list date-grouping-str 12 t))
+            (vconcat (list (list (symbol-name date-grouping) 12 t))
                      (mapcar (lambda (metric-name)
                                (let ((label (format "%s %s" metric-name (replace-regexp-in-string "-" " " (symbol-name value-transform)))))
                                  (list label (max 10 (1+ (length label))) (metrics-tracker--num-sort 1))))
@@ -587,7 +630,7 @@ If ARG is given, allow selection of multiple metrics."
 
       ;; configure
       (setq tabulated-list-padding 2)
-      (setq tabulated-list-sort-key (cons date-grouping-str nil))
+      (setq tabulated-list-sort-key (cons (symbol-name date-grouping) nil))
 
       ;; set table data
       (let (data date-str)
@@ -610,40 +653,69 @@ If ARG is given, allow selection of multiple metrics."
 
 ;;;###autoload
 (defun metrics-tracker-cal ()
-  "Get a calendar view of the requested metric."
+  "Interactive way to get a calendar view of a requested metric.
+
+This function gets user input and then delegates to
+`metrics-tracker-cal-render'."
   (interactive)
 
   ;; make sure `metrics-tracker-metric-index' has been populated
   (metrics-tracker--load-index)
 
   (let* ((ivy-sort-functions-alist nil)
-         (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
-         (today (metrics-tracker--today))
          ;; ask for params
+         (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
          (metric-name-str (completing-read "Metric: " (metrics-tracker--presorted-options all-metric-names) nil t))
-         (metric-name (intern metric-name-str metrics-tracker-metric-names))
          (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
                                                                         (metrics-tracker--value-transform-options 'day))
-                                                   nil t nil nil "total")))
-         ;; load metric data into bins
-         (bin-data (metrics-tracker--bin-metric-data metric-name 'day value-transform today t))
-         ;; find the first date
-         (dates (hash-table-keys bin-data))
-         (first (seq-reduce (lambda (first ii) (if (time-less-p first ii) first ii))
-                                    dates (car dates))))
+                                                   nil t nil nil "total"))))
+    (metrics-tracker-cal-render (list metric-name-str value-transform))))
+
+;;;###autoload
+(defun metrics-tracker-cal-render (cal-config)
+  "Programmatic way to get a calendar view of a requested metric.
+
+CAL-CONFIG should be a list of all inputs needed to generate the calendar.
+The first item in the list is a metric name.
+The second item is a value transform.
+Metric name is a string and value transform is a symbol.
+
+For example:
+    '(\"metricname\" total)"
+
+  ;; make sure `metrics-tracker-metric-index' has been populated
+  (metrics-tracker--load-index)
+
+  (let* ((today (metrics-tracker--today))
+         (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
+         (metric-name (intern (nth 0 cal-config) metrics-tracker-metric-names))
+         (value-transform (nth 1 cal-config)))
+
+    ;; validate inputs
+    (metrics-tracker--validate-input "metric" metric-name all-metric-names)
+    (metrics-tracker--validate-input "value-transform" value-transform (metrics-tracker--value-transform-options 'day))
+
+    ;; save the config
+    (setq metrics-tracker-last-report-config cal-config)
 
     (metrics-tracker--setup-output-buffer)
     (fundamental-mode)
 
     ;; render the calendars
     (let* ((inhibit-read-only t)
+           ;; load metric data into bins
+           (bin-data (metrics-tracker--bin-metric-data metric-name 'day value-transform today t))
+           (dates (hash-table-keys bin-data))
+           ;; find the first date
+           (first (seq-reduce (lambda (first ii) (if (time-less-p first ii) first ii))
+                             dates (car dates)))
            (first-decoded (decode-time first))
            (month (nth 4 first-decoded))
            (year (nth 5 first-decoded))
            (today-decoded (decode-time today))
            (this-month (nth 4 today-decoded))
            (this-year (nth 5 today-decoded)))
-      (insert (format "  %s\n\n" metric-name-str))
+      (insert (format "  %s\n\n" (symbol-name metric-name)))
       (put-text-property (point-min) (point-max) 'face 'bold)
       (while (or (<= month this-month)
                  (< year this-year))
@@ -678,9 +750,52 @@ values."
 
 ;;;###autoload
 (defun metrics-tracker-graph (arg)
-  "Get a graph of the requested metric.
-If ARG is given, allow selection of multiple metrics."
+  "Interactive way to get a graph of requested metrics.
+ARG is optional, but if given and it is the default argument,
+allow selection of multiple metrics.
+
+This function gets user input and then delegates to
+`metrics-tracker-graph-render'."
   (interactive "P")
+
+  (metrics-tracker--check-gnuplot-exists)
+
+  ;; make sure `metrics-tracker-metric-index' has been populated
+  (metrics-tracker--load-index)
+
+  (let* ((ivy-sort-functions-alist nil)
+         ;; ask for params
+         (multp (equal arg '(4)))
+         (metric-names-str (metrics-tracker--ask-for-metrics multp))
+         (date-grouping (intern (completing-read "Group dates by: " (metrics-tracker--presorted-options
+                                                                     (metrics-tracker--date-grouping-options))
+                                                 nil t nil nil "month")))
+         (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
+                                                                        (metrics-tracker--value-transform-options date-grouping))
+                                                   nil t nil nil "total")))
+         (graph-type (intern (completing-read "Graph type: " (metrics-tracker--presorted-options
+                                                              (metrics-tracker--graph-options date-grouping))
+                                              nil t)))
+         (graph-output (intern (completing-read "Graph output: " (metrics-tracker--presorted-options
+                                                                  metrics-tracker-graph-output-options)
+                                                nil t nil nil "ascii"))))
+
+    (metrics-tracker-graph-render (list metric-names-str date-grouping value-transform graph-type graph-output))))
+
+;;;###autoload
+(defun metrics-tracker-graph-render (graph-config)
+  "Programmatic way to get a graph of the requested metric.
+
+GRAPH-CONFIG should be a list of all inputs needed to render a graph.
+The first item in the list is a list of metric names.
+The second item is a date grouping.
+The third item is a value transform.
+The fourth item is the graph type.
+The fifth item is the graph output option.
+Metric names are strings but all other options are symbols.
+
+For example:
+    '((\"metricname\") year total line svg)"
 
   (metrics-tracker--check-gnuplot-exists)
 
@@ -690,28 +805,32 @@ If ARG is given, allow selection of multiple metrics."
   (let* ((ivy-sort-functions-alist nil)
          (today (metrics-tracker--today))
          ;; ask for params
-         (multp (not (null arg)))
-         (metric-names-str (metrics-tracker--ask-for-metrics multp))
+         (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
+         (metric-names-str (nth 0 graph-config))
          (metric-names (mapcar (lambda (name) (intern name metrics-tracker-metric-names)) metric-names-str))
-         (date-grouping (intern (completing-read "Group dates by: " (metrics-tracker--presorted-options
-                                                                     (metrics-tracker--date-grouping-options))
-                                                 nil t nil nil "month")))
-         (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
-                                                                        (metrics-tracker--value-transform-options date-grouping))
-                                                   nil t nil nil "total")))
-         (graph-type (intern (completing-read "Graph type: " (metrics-tracker--presorted-options
-                                                              (metrics-tracker--graph-options-for-graphs date-grouping))
-                                              nil t)))
-         (graph-output (intern (completing-read "Graph output: " (metrics-tracker--presorted-options
-                                                                  metrics-tracker-graph-output-options)
-                                                nil t nil nil "ascii")))
-         ;; load metric data into bins; list of `bin-data' for each metric in the same order as `metric-names'
-         (bin-data-all (mapcar (lambda (metric-name) (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today))
+         (date-grouping (nth 1 graph-config))
+         (value-transform (nth 2 graph-config))
+         (graph-type (nth 3 graph-config))
+         (graph-output (nth 4 graph-config))
+         bin-data-all buffer fname)
+
+    (dolist (metric metric-names t)
+      (metrics-tracker--validate-input "metric" metric all-metric-names))
+    (metrics-tracker--validate-input "date-grouping" date-grouping (metrics-tracker--date-grouping-options))
+    (metrics-tracker--validate-input "value-transform" value-transform (metrics-tracker--value-transform-options date-grouping))
+    (metrics-tracker--validate-input "graph-type" graph-type (metrics-tracker--graph-options date-grouping))
+    (metrics-tracker--validate-input "graph-output" graph-output metrics-tracker-graph-output-options)
+
+    ;; save the config
+    (setq metrics-tracker-last-report-config graph-config)
+
+    ;; load metric data into bins; list of `bin-data' for each metric in the same order as `metric-names'
+    (setq bin-data-all (mapcar (lambda (metric-name) (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today))
                                metric-names))
 
-         ;; prep output buffer
-         (buffer (get-buffer-create metrics-tracker-output-buffer-name))
-         (fname (and (not (eq graph-output 'ascii)) (make-temp-file "metrics-tracker"))))
+    ;; prep output buffer
+    (setq buffer (get-buffer-create metrics-tracker-output-buffer-name)
+          fname (and (not (eq graph-output 'ascii)) (make-temp-file "metrics-tracker")))
 
     (with-temp-buffer
       (metrics-tracker--make-gnuplot-config metric-names
@@ -747,7 +866,7 @@ If ARG is given, allow selection of multiple metrics."
 METRIC-NAMES a list of metric names being plotted.
 DATE-GROUPING the name of the date grouping used to bin the data.
 VALUE-TRANSFORM the name of the value transform used on each bin.
-BIN-DATA-ALL a list bin-data (which is a hash of dates to values) in the same order as METRIC-NAMEs.
+BIN-DATA-ALL a list bin-data (which is a hash of dates to values) in the same order as METRIC-NAMES.
 GRAPH-TYPE the type of graph (line, bar, scatter).
 GRAPH-OUTPUT the graph output format (ascii, svg, png).
 FNAME is the filename of the temp file to write."
