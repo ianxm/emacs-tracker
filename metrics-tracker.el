@@ -1,10 +1,10 @@
-;;; metrics-tracker.el --- Generate diagrams of personal metrics from diary entries  -*- lexical-binding: t -*-
+;;; metrics-tracker.el --- Generate reports of personal metrics from diary entries  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2019-2020 Ian Martins
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.1.7
+;; Version: 0.1.8
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -25,7 +25,7 @@
 
 ;;; Commentary:
 
-;; metrics-tracker.el generates tables and charts from the personal metrics
+;; metrics-tracker.el generates tables and graphs from the personal metrics
 ;; data found in your diary entries.
 
 ;;; Code:
@@ -72,6 +72,47 @@ For example: '(\"pushups\" \"situps\")"
 (defcustom metrics-tracker-dark-mode nil
   "If \"t\", generate graph images with dark backgrounds."
   :type 'boolean
+  :group 'metrics-tracker)
+
+(defcustom metrics-tracker-named-reports nil
+  "Pre-configured reports that can be easily re-rendered with current data.
+
+All metrics tracker report types are supported.  Add to this list
+by generating the report to save and then calling
+`metrics-tracker-save-last-report', or by editing this list in
+`customize'.
+
+Display a report from this list using `metrics-tracker-show-named-report'."
+  :type '(repeat
+          (choice (list :tag "Table Report"
+                        (string :tag "Report Name")
+                        (const :tag "Table Report" table)
+                        (repeat :tag "Metric Names" string)
+                        (choice :tag "Date Grouping  " (const day) (const week) (const month) (const year) (const full))
+                        (choice :tag "Value Transform" (const total) (const count) (const percent) (const :tag "per day" per-day)
+                                (const :tag "per week" per-week) (const :tag "per month" per-month) (const :tag "per year" per-year)
+                                (const :tag "difference total" diff-total) (const :tag "difference percent" diff-percent) (const :tag "difference per day" diff-per-day)
+                                (const :tag "difference per week" diff-per-week) (const :tag "difference per month" diff-per-month) (const :tag "difference per year" diff-per-year)))
+                  (list :tag "Calendar Report"
+                        (string :tag "Report Name")
+                        (const :tag "Calendar Report" cal)
+                        (repeat :tag "Metric Names" string)
+                        (choice :tag "Value Transform" (const total) (const count)))
+                  (list :tag "Graph Report"
+                        (string :tag "Report Name")
+                        (const :tag "Graph Report" graph)
+                        (repeat :tag "Metric Names" string)
+                        (choice :tag "Date Grouping  " (const day) (const week) (const month) (const year) (const full))
+                        (choice :tag "Value Transform" (const total) (const count) (const percent) (const :tag "per day" per-day)
+                                (const :tag "per week" per-week) (const :tag "per month" per-month) (const :tag "per year" per-year)
+                                (const :tag "difference total" diff-total) (const :tag "difference percent" diff-percent) (const :tag "difference per day" diff-per-day)
+                                (const :tag "difference per week" diff-per-week) (const :tag "difference per month" diff-per-month) (const :tag "difference per year" diff-per-year))
+                        (const :tag "Reserved" nil)
+                        (const :tag "Reserved" nil)
+                        (const :tag "Reserved" nil)
+                        (choice :tag "Graph Type     " (const line) (const bar) (const stacked) (const scatter))
+                        (choice :tag "Graph Output   " (const ascii) (const svg) (const png)))))
+
   :group 'metrics-tracker)
 
 (defvar metrics-tracker-metric-index nil
@@ -597,7 +638,7 @@ For example:
     (metrics-tracker--validate-input "value-transform" value-transform (metrics-tracker--value-transform-options date-grouping))
 
     ;; save the config
-    (setq metrics-tracker-last-report-config table-config)
+    (setq metrics-tracker-last-report-config (cons 'table table-config))
 
     ;; load metric data into bins; list of `bin-data' for each metric in the same order as `metric-names'
     (setq bin-data-all (mapcar (lambda (metric-name) (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today))
@@ -696,7 +737,7 @@ For example:
     (metrics-tracker--validate-input "value-transform" value-transform (metrics-tracker--value-transform-options 'day))
 
     ;; save the config
-    (setq metrics-tracker-last-report-config cal-config)
+    (setq metrics-tracker-last-report-config (cons 'cal cal-config))
 
     (metrics-tracker--setup-output-buffer)
     (fundamental-mode)
@@ -780,7 +821,8 @@ This function gets user input and then delegates to
                                                                   metrics-tracker-graph-output-options)
                                                 nil t nil nil "ascii"))))
 
-    (metrics-tracker-graph-render (list metric-names-str date-grouping value-transform graph-type graph-output))))
+    (metrics-tracker-graph-render (list metric-names-str date-grouping value-transform
+                                        nil nil nil graph-type graph-output))))
 
 ;;;###autoload
 (defun metrics-tracker-graph-render (graph-config)
@@ -790,12 +832,15 @@ GRAPH-CONFIG should be a list of all inputs needed to render a graph.
 The first item in the list is a list of metric names.
 The second item is a date grouping.
 The third item is a value transform.
-The fourth item is the graph type.
-The fifth item is the graph output option.
+The fourth item is reserved.
+The fifth item is reserved.
+The sixth item is reserved.
+The seventh item is the graph type.
+The eighth item is the graph output option.
 Metric names are strings but all other options are symbols.
 
 For example:
-    '((\"metricname\") year total line svg)"
+    '((\"metricname\") year total nil nil nil line svg)"
 
   (metrics-tracker--check-gnuplot-exists)
 
@@ -810,8 +855,8 @@ For example:
          (metric-names (mapcar (lambda (name) (intern name metrics-tracker-metric-names)) metric-names-str))
          (date-grouping (nth 1 graph-config))
          (value-transform (nth 2 graph-config))
-         (graph-type (nth 3 graph-config))
-         (graph-output (nth 4 graph-config))
+         (graph-type (nth 6 graph-config))
+         (graph-output (nth 7 graph-config))
          bin-data-all buffer fname)
 
     (dolist (metric metric-names t)
@@ -822,7 +867,7 @@ For example:
     (metrics-tracker--validate-input "graph-output" graph-output metrics-tracker-graph-output-options)
 
     ;; save the config
-    (setq metrics-tracker-last-report-config graph-config)
+    (setq metrics-tracker-last-report-config (cons 'graph graph-config))
 
     ;; load metric data into bins; list of `bin-data' for each metric in the same order as `metric-names'
     (setq bin-data-all (mapcar (lambda (metric-name) (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today))
@@ -977,6 +1022,41 @@ METRIC-NAMES is the list of metric names being plotted."
                                                            (= num-lines 1)) "pt \"*\"" "")
                                                   (nth ii colors) comma)))))))
     plot-def))
+
+;;;###autoload
+(defun metrics-tracker-save-last-report (name)
+"Save the last report as a report named NAME."
+  (interactive "sReport name: ")
+
+  ;; verify there is a last report
+  (if (null metrics-tracker-last-report-config)
+      (error "There is no last report to save"))
+
+  (setq metrics-tracker-named-reports (nconc metrics-tracker-named-reports
+                                             (list (cons name metrics-tracker-last-report-config))))
+  (message "Saved"))
+
+;;;###autoload
+(defun metrics-tracker-show-named-report ()
+"Render a previously saved report.
+This prompts for which report (saved in
+`metrics-tracker-named-reports') to render, then renders it."
+  (interactive)
+
+  (if (= (length metrics-tracker-named-reports) 0)
+      (error "There are no named reports"))
+
+  (let* ((report-name (completing-read "Named report: " (mapcar #'car metrics-tracker-named-reports) nil t))
+         (report (seq-find (lambda (item) (equal (nth 0 item) report-name))
+                           metrics-tracker-named-reports))
+         (report-type (cadr report))
+         (report-config (cddr report)))
+    (cond ((eq report-type 'table)
+           (metrics-tracker-table-render report-config))
+          ((eq report-type 'cal)
+           (metrics-tracker-cal-render report-config))
+          ((eq report-type 'graph)
+           (metrics-tracker-graph-render report-config)))))
 
 (provide 'metrics-tracker)
 

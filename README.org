@@ -333,14 +333,38 @@ Jan 4, 2020 run dist 2
     using the ~metrics-tracker-graph-colors~ custom variable, which
     contains a list of colors specified as hex values.
 
+**** named reports
+
+     there are several steps in generating a report.  to make it
+     easier to pull up a report in the future, you can save it as a
+     named report.  this can be done by running
+
+     @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-save-named-report~
+
+     or by modifying the variable ~metrics-tracker-named-reports~ in
+     ~customize~.  the fields in named reports are the same as the
+     input parameters requested during report generation.  this is
+     what it looks like in ~customize~.
+
+     [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/metrics_tracker_named_reports.png]]
+
+     you can display a named report by running
+
+     @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-show named-report~
+
+     and choosing which report to show.  the report will be rendered
+     using current data (not the data at the time the report was
+     saved).
+
 ** customization
 
     metrics-tracker.el defines several variables that can be used to customize behavior.
 
     - metrics-tracker-dark-mode :: if ~t~, enable dark mode for image graphs
     - metrics-tracker-graph-colors :: two lists of colors to use for graph series in light mode and dark mode
-    - metrics-tracker-metric-name-whitelist :: if given, read only these metrics when parsing the diary file
-    - metrics-tracker-metric-name-blacklist :: if given, ignore these metrics when parsing the diary file
+    - metrics-tracker-metric-name-whitelist :: if set, read only these metrics when parsing the diary file
+    - metrics-tracker-metric-name-blacklist :: if set, ignore these metrics when parsing the diary file
+    - metrics-tracker-named-reports :: a list of saved reports
 
 ** todo
    - reports
