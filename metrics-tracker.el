@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.1.8
+;; Version: 0.1.9
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -92,12 +92,16 @@ Display a report from this list using `metrics-tracker-show-named-report'."
                         (choice :tag "Value Transform" (const total) (const count) (const percent) (const :tag "per day" per-day)
                                 (const :tag "per week" per-week) (const :tag "per month" per-month) (const :tag "per year" per-year)
                                 (const :tag "difference total" diff-total) (const :tag "difference percent" diff-percent) (const :tag "difference per day" diff-per-day)
-                                (const :tag "difference per week" diff-per-week) (const :tag "difference per month" diff-per-month) (const :tag "difference per year" diff-per-year)))
+                                (const :tag "difference per week" diff-per-week) (const :tag "difference per month" diff-per-month) (const :tag "difference per year" diff-per-year))
+                        (choice :tag "Start Date     " (const :tag "None" nil) (string :tag "Enter YYYY-MM-DD"))
+                        (choice :tag "End Date       " (const :tag "None" nil) (string :tag "Enter YYYY-MM-DD")))
                   (list :tag "Calendar Report"
                         (string :tag "Report Name")
                         (const :tag "Calendar Report" cal)
                         (repeat :tag "Metric Names" string)
-                        (choice :tag "Value Transform" (const total) (const count)))
+                        (choice :tag "Value Transform" (const total) (const count))
+                        (choice :tag "Start Date     " (const :tag "None" nil) (string :tag "Enter YYYY-MM-DD"))
+                        (choice :tag "End Date       " (const :tag "None" nil) (string :tag "Enter YYYY-MM-DD")))
                   (list :tag "Graph Report"
                         (string :tag "Report Name")
                         (const :tag "Graph Report" graph)
@@ -107,8 +111,8 @@ Display a report from this list using `metrics-tracker-show-named-report'."
                                 (const :tag "per week" per-week) (const :tag "per month" per-month) (const :tag "per year" per-year)
                                 (const :tag "difference total" diff-total) (const :tag "difference percent" diff-percent) (const :tag "difference per day" diff-per-day)
                                 (const :tag "difference per week" diff-per-week) (const :tag "difference per month" diff-per-month) (const :tag "difference per year" diff-per-year))
-                        (const :tag "Reserved" nil)
-                        (const :tag "Reserved" nil)
+                        (choice :tag "Start Date     " (const :tag "None" nil) (string :tag "Enter YYYY-MM-DD"))
+                        (choice :tag "End Date       " (const :tag "None" nil) (string :tag "Enter YYYY-MM-DD"))
                         (const :tag "Reserved" nil)
                         (choice :tag "Graph Type     " (const line) (const bar) (const stacked) (const scatter))
                         (choice :tag "Graph Output   " (const ascii) (const svg) (const png)))))
@@ -143,10 +147,11 @@ the diary file to be re-read if the data is needed again.")
   "Return the later of the given dates D1 and D2."
   `(if (time-less-p ,d1 ,d2) ,d2 ,d1))
 
-(defun metrics-tracker--today ()
-  "Return a time value for today.  This is the current day with the time values zeroed out."
+(defun metrics-tracker--string-to-time (&optional date-str)
+  "Convert the optional DATE-STR to a time value, or return a time value for today.
+Returned a time value with hours, minutes, seconds zeroed out."
   (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
-                               (seq-take (parse-time-string (format-time-string "%F")) 6))))
+                               (seq-take (parse-time-string (or date-str (format-time-string "%F"))) 6))))
 
 (defun metrics-tracker--process-diary (filter action)
   "Parse the diary file.
@@ -231,7 +236,7 @@ This reads the diary file and populated in
   (unless metrics-tracker-metric-index
     (let* (metrics ; will contain plist of metric-name -> (metric-name count first last daysago)
            existing-metric
-           (today (metrics-tracker--today))
+           (today (metrics-tracker--string-to-time))
            (list-filter-fcn (cond ((not (null metrics-tracker-metric-name-whitelist))
                                    (lambda (_date name) ; filter out non-whitelisted metrics
                                      (seq-contains metrics-tracker-metric-name-whitelist (symbol-name name))))
@@ -604,31 +609,36 @@ This function gets user input and then delegates to
          (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
                                                                         (metrics-tracker--value-transform-options date-grouping))
                                                    nil t nil nil "total"))))
-    (metrics-tracker-table-render (list metric-names-str date-grouping value-transform))))
+    (metrics-tracker-table-render (list metric-names-str date-grouping value-transform nil nil))))
 
 ;;;###autoload
 (defun metrics-tracker-table-render (table-config)
   "Programmatic way to get a tabular view of the requested metric.
 
 TABLE-CONFIG should be a list of all inputs needed to render a table.
-The first item in the list is a list of metric names.
-The second item is a date grouping.
-The third item is a value transform.
-Metric names are strings but date grouping and value transform
-are symbols.
+The first item in the list is a list of metric names as strings.
+The second item is a date grouping as a symbol.
+The third item is a value transform as a symbol.
+The fourth item (optional) is a date string, ignore occurrences before.
+The fifth item (optional) is a date string, ignore occurrences after.
+Date strings must be in YYYY-MM-DD format.
 
 For example:
-    '((\"metricname\") year total)"
+    '((\"metricname\") year total nil nil)"
 
   ;; make sure `metrics-tracker-metric-index' has been populated
   (metrics-tracker--load-index)
 
-  (let* ((today (metrics-tracker--today))
+  (let* ((today (metrics-tracker--string-to-time))
          (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
          (metric-names-str (nth 0 table-config))
          (metric-names (mapcar (lambda (name) (intern name metrics-tracker-metric-names)) metric-names-str))
          (date-grouping (nth 1 table-config))
          (value-transform (nth 2 table-config))
+         (start-date (and (nth 3 table-config)
+                          (metrics-tracker--string-to-time (nth 3 table-config))))
+         (end-date (and (nth 4 table-config)
+                          (metrics-tracker--string-to-time (nth 4 table-config))))
          bin-data-all merged-dates)
 
     ;; validate inputs
@@ -636,6 +646,8 @@ For example:
       (metrics-tracker--validate-input "metric" metric all-metric-names))
     (metrics-tracker--validate-input "date-grouping" date-grouping (metrics-tracker--date-grouping-options))
     (metrics-tracker--validate-input "value-transform" value-transform (metrics-tracker--value-transform-options date-grouping))
+    (unless (or (null start-date) (null end-date) (time-less-p start-date end-date))
+      (error "The end date is before the start date"))
 
     ;; save the config
     (setq metrics-tracker-last-report-config (cons 'table table-config))
@@ -676,14 +688,18 @@ For example:
       ;; set table data
       (let (data date-str)
         (dolist (date merged-dates)
-          (setq date-str (if (eq date-grouping 'full)
-                             "full"
-                           (format-time-string (metrics-tracker--format-bin date-grouping) date)))
-          (setq data (cons (list date-str
-                                 (vconcat (list date-str)
-                                          (mapcar (lambda (bin-data) (gethash date bin-data "")) bin-data-all)))
-                           data))
-          (setq-local tabulated-list-entries data)))
+          (when (and (or (null start-date) ; only use occurrences between `start-date' and `end-date', inclusive
+                         (not (time-less-p date start-date)))
+                     (or (null end-date)
+                         (not (time-less-p end-date date))))
+            (setq date-str (if (eq date-grouping 'full)
+                               "full"
+                             (format-time-string (metrics-tracker--format-bin date-grouping) date))
+                  data (cons (list date-str
+                                   (vconcat (list date-str)
+                                            (mapcar (lambda (bin-data) (gethash date bin-data "")) bin-data-all)))
+                             data))
+            (setq-local tabulated-list-entries data))))
 
       ;; render the table
       (let ((inhibit-read-only t))
@@ -717,24 +733,32 @@ This function gets user input and then delegates to
   "Programmatic way to get a calendar view of a requested metric.
 
 CAL-CONFIG should be a list of all inputs needed to generate the calendar.
-The first item in the list is a metric name.
-The second item is a value transform.
-Metric name is a string and value transform is a symbol.
+The first item in the list is a metric name as a string.
+The second item is a value transform as a symbol.
+The third item (optional) is a date string, ignore occurrences before.
+The fourth item (optional) is a date string, ignore occurrences after.
+Date strings must be in YYYY-MM-DD format.
 
 For example:
-    '(\"metricname\" total)"
+    '(\"metricname\" total nil nil)"
 
   ;; make sure `metrics-tracker-metric-index' has been populated
   (metrics-tracker--load-index)
 
-  (let* ((today (metrics-tracker--today))
+  (let* ((today (metrics-tracker--string-to-time))
          (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
          (metric-name (intern (nth 0 cal-config) metrics-tracker-metric-names))
-         (value-transform (nth 1 cal-config)))
+         (value-transform (nth 1 cal-config))
+         (start-date (and (nth 2 cal-config)
+                          (metrics-tracker--string-to-time (nth 2 cal-config))))
+         (end-date (and (nth 3 cal-config)
+                          (metrics-tracker--string-to-time (nth 3 cal-config)))))
 
     ;; validate inputs
     (metrics-tracker--validate-input "metric" metric-name all-metric-names)
     (metrics-tracker--validate-input "value-transform" value-transform (metrics-tracker--value-transform-options 'day))
+    (unless (or (null start-date) (null end-date) (time-less-p start-date end-date))
+      (error "The end date is before the start date"))
 
     ;; save the config
     (setq metrics-tracker-last-report-config (cons 'cal cal-config))
@@ -748,19 +772,22 @@ For example:
            (bin-data (metrics-tracker--bin-metric-data metric-name 'day value-transform today t))
            (dates (hash-table-keys bin-data))
            ;; find the first date
-           (first (seq-reduce (lambda (first ii) (if (time-less-p first ii) first ii))
-                             dates (car dates)))
+           (first (or start-date
+                      (seq-reduce (lambda (first ii) (if (time-less-p first ii) first ii))
+                                  dates (car dates))))
            (first-decoded (decode-time first))
            (month (nth 4 first-decoded))
            (year (nth 5 first-decoded))
-           (today-decoded (decode-time today))
-           (this-month (nth 4 today-decoded))
-           (this-year (nth 5 today-decoded)))
+           ;; find the month on which to end
+           (end (or end-date today))
+           (end-decoded (decode-time end))
+           (end-month (nth 4 end-decoded))
+           (end-year (nth 5 end-decoded)))
       (insert (format "  %s\n\n" (symbol-name metric-name)))
       (put-text-property (point-min) (point-max) 'face 'bold)
-      (while (or (<= month this-month)
-                 (< year this-year))
-        (metrics-tracker--print-month month year bin-data first today)
+      (while (or (<= month end-month)
+                 (< year end-year))
+        (metrics-tracker--print-month month year bin-data first end)
         (insert "\n\n\n")
         (setq month (1+ month))
         (when (> month 12)
@@ -829,15 +856,15 @@ This function gets user input and then delegates to
   "Programmatic way to get a graph of the requested metric.
 
 GRAPH-CONFIG should be a list of all inputs needed to render a graph.
-The first item in the list is a list of metric names.
-The second item is a date grouping.
-The third item is a value transform.
-The fourth item is reserved.
-The fifth item is reserved.
+The first item in the list is a list of metric names as strings.
+The second item is a date grouping as a symbol.
+The third item is a value transform as a symbol.
+The fourth item (optional) is a date string, ignore occurrences before.
+The fifth item (optional) is a date string, ignore occurrences after.
 The sixth item is reserved.
-The seventh item is the graph type.
-The eighth item is the graph output option.
-Metric names are strings but all other options are symbols.
+The seventh item is the graph type as a symbol.
+The eighth item is the graph output option as a symbol.
+Date strings must be in YYYY-MM-DD format.
 
 For example:
     '((\"metricname\") year total nil nil nil line svg)"
@@ -848,13 +875,17 @@ For example:
   (metrics-tracker--load-index)
 
   (let* ((ivy-sort-functions-alist nil)
-         (today (metrics-tracker--today))
+         (today (metrics-tracker--string-to-time))
          ;; ask for params
          (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
          (metric-names-str (nth 0 graph-config))
          (metric-names (mapcar (lambda (name) (intern name metrics-tracker-metric-names)) metric-names-str))
          (date-grouping (nth 1 graph-config))
          (value-transform (nth 2 graph-config))
+         (start-date (and (nth 3 graph-config)
+                          (metrics-tracker--string-to-time (nth 3 graph-config))))
+         (end-date (and (nth 4 graph-config)
+                          (metrics-tracker--string-to-time (nth 4 graph-config))))
          (graph-type (nth 6 graph-config))
          (graph-output (nth 7 graph-config))
          bin-data-all buffer fname)
@@ -865,6 +896,8 @@ For example:
     (metrics-tracker--validate-input "value-transform" value-transform (metrics-tracker--value-transform-options date-grouping))
     (metrics-tracker--validate-input "graph-type" graph-type (metrics-tracker--graph-options date-grouping))
     (metrics-tracker--validate-input "graph-output" graph-output metrics-tracker-graph-output-options)
+    (unless (or (null start-date) (null end-date) (time-less-p start-date end-date))
+      (error "The end date is before the start date"))
 
     ;; save the config
     (setq metrics-tracker-last-report-config (cons 'graph graph-config))
@@ -879,9 +912,10 @@ For example:
 
     (with-temp-buffer
       (metrics-tracker--make-gnuplot-config metric-names
-                                    date-grouping value-transform
-                                    bin-data-all
-                                    graph-type graph-output fname)
+                                            date-grouping value-transform
+                                            start-date end-date
+                                            bin-data-all
+                                            graph-type graph-output fname)
       (save-current-buffer
         (metrics-tracker--setup-output-buffer)
         (fundamental-mode))
@@ -904,13 +938,16 @@ For example:
       (metrics-tracker--show-output-buffer))))
 
 (defun metrics-tracker--make-gnuplot-config (metric-names
-                                     date-grouping value-transform
-                                     bin-data-all
-                                     graph-type graph-output fname)
+                                             date-grouping value-transform
+                                             start-date end-date
+                                             bin-data-all
+                                             graph-type graph-output fname)
   "Write a gnuplot config (including inline data) to the (empty) current buffer.
 METRIC-NAMES a list of metric names being plotted.
 DATE-GROUPING the name of the date grouping used to bin the data.
 VALUE-TRANSFORM the name of the value transform used on each bin.
+START-DATE if given, filter out occurrences before
+END-DATE if given, filter out occurrences after
 BIN-DATA-ALL a list bin-data (which is a hash of dates to values) in the same order as METRIC-NAMES.
 GRAPH-TYPE the type of graph (line, bar, scatter).
 GRAPH-OUTPUT the graph output format (ascii, svg, png).
@@ -937,12 +974,16 @@ FNAME is the filename of the temp file to write."
     (let ((default (if (or (eq graph-type 'line) (eq graph-type 'scatter)) "." "0"))
           date-str)
       (dolist (date merged-dates)
-        (setq date-str (if (eq date-grouping 'full)
-                           "full"
-                         (format-time-string (metrics-tracker--format-bin date-grouping) date)))
-        (setq data (cons (append (list date-str)
-                                 (mapcar (lambda (bin-data) (gethash date bin-data default)) bin-data-all))
-                         data)))
+        (when (and (or (null start-date) ; only use occurrences between `start-date' and `end-date', inclusive
+                       (not (time-less-p date start-date)))
+                   (or (null end-date)
+                       (not (time-less-p end-date date))))
+          (setq date-str (if (eq date-grouping 'full)
+                             "full"
+                           (format-time-string (metrics-tracker--format-bin date-grouping) date)))
+          (setq data (cons (append (list date-str)
+                                   (mapcar (lambda (bin-data) (gethash date bin-data default)) bin-data-all))
+                           data))))
       (setq data (reverse data))
       (setq num-lines (1- (length (car data)))))
 
