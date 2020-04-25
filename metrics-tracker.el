@@ -639,7 +639,7 @@ For example:
                           (metrics-tracker--string-to-time (nth 3 table-config))))
          (end-date (and (nth 4 table-config)
                           (metrics-tracker--string-to-time (nth 4 table-config))))
-         bin-data-all merged-dates)
+         bin-data-all)
 
     ;; validate inputs
     (dolist (metric metric-names t)
@@ -654,12 +654,7 @@ For example:
 
     ;; load metric data into bins; list of `bin-data' for each metric in the same order as `metric-names'
     (setq bin-data-all (mapcar (lambda (metric-name) (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today))
-                               metric-names)
-          merged-dates (seq-reduce (lambda (dates ii) (append (hash-table-keys ii) dates))
-                                   bin-data-all
-                                   nil))
-    (delete-dups merged-dates)
-    (setq merged-dates (metrics-tracker--sort-dates merged-dates))
+                               metric-names))
 
     (if (and (eq date-grouping 'full)
              (= 1 (length metric-names)))
@@ -685,21 +680,8 @@ For example:
       (setq tabulated-list-padding 2)
       (setq tabulated-list-sort-key (cons (symbol-name date-grouping) nil))
 
-      ;; set table data
-      (let (data date-str)
-        (dolist (date merged-dates)
-          (when (and (or (null start-date) ; only use occurrences between `start-date' and `end-date', inclusive
-                         (not (time-less-p date start-date)))
-                     (or (null end-date)
-                         (not (time-less-p end-date date))))
-            (setq date-str (if (eq date-grouping 'full)
-                               "full"
-                             (format-time-string (metrics-tracker--format-bin date-grouping) date))
-                  data (cons (list date-str
-                                   (vconcat (list date-str)
-                                            (mapcar (lambda (bin-data) (gethash date bin-data "")) bin-data-all)))
-                             data))
-            (setq-local tabulated-list-entries data))))
+      ;; compute and set table data
+      (setq-local tabulated-list-entries (metrics-tracker--compute-data bin-data-all date-grouping start-date end-date nil))
 
       ;; render the table
       (let ((inhibit-read-only t))
@@ -707,6 +689,41 @@ For example:
         (tabulated-list-print nil nil))
 
       (metrics-tracker--show-output-buffer))))
+
+(defun metrics-tracker--compute-data (bin-data-all date-grouping start-date end-date graph-type)
+  "Return a list of '(date-str [date-str metric1 metric2 metric3]).
+
+BIN-DATA-ALL is a list of hashtables containing bin data for each metric.
+DATE-GROUPING is the selected bin size.
+START-DATE if given, filter occurrences before.
+END-DATE if given, filter occurrences after.
+GRAPH-TYPE is the selected graph type, if the current operation is a graph."
+  (let ((gap-value (cond ((or (eq graph-type 'line) (eq graph-type 'scatter)) ".") ; line or scatter use "." for gaps
+                         ((not (null graph-type)) "0") ; other graphs use "0" for gaps
+                         (t "" ))) ; tables use "" for gaps
+        merged-dates date-str data)
+
+    ;; merge dates across metrics and sort
+    (setq merged-dates (seq-reduce (lambda (dates ii) (append (hash-table-keys ii) dates))
+                                   bin-data-all
+                                   nil))
+    (delete-dups merged-dates)
+    (setq merged-dates (metrics-tracker--sort-dates merged-dates))
+
+    ;; pull data for each metric for each date (builds a list backwards)
+    (dolist (date merged-dates)
+      (when (and (or (null start-date) ; only use occurrences between `start-date' and `end-date', inclusive
+                     (not (time-less-p date start-date)))
+                 (or (null end-date)
+                     (not (time-less-p end-date date))))
+        (setq date-str (if (eq date-grouping 'full)
+                           "full"
+                         (format-time-string (metrics-tracker--format-bin date-grouping) date))
+              data (cons (list date-str
+                               (vconcat (list date-str)
+                                        (mapcar (lambda (bin-data) (gethash date bin-data gap-value)) bin-data-all)))
+                         data))))
+    (reverse data))) ; return data
 
 ;;;###autoload
 (defun metrics-tracker-cal ()
@@ -888,7 +905,7 @@ For example:
                           (metrics-tracker--string-to-time (nth 4 graph-config))))
          (graph-type (nth 6 graph-config))
          (graph-output (nth 7 graph-config))
-         bin-data-all buffer fname)
+         buffer fname)
 
     (dolist (metric metric-names t)
       (metrics-tracker--validate-input "metric" metric all-metric-names))
@@ -902,20 +919,19 @@ For example:
     ;; save the config
     (setq metrics-tracker-last-report-config (cons 'graph graph-config))
 
-    ;; load metric data into bins; list of `bin-data' for each metric in the same order as `metric-names'
-    (setq bin-data-all (mapcar (lambda (metric-name) (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today))
-                               metric-names))
-
     ;; prep output buffer
     (setq buffer (get-buffer-create metrics-tracker-output-buffer-name)
           fname (and (not (eq graph-output 'ascii)) (make-temp-file "metrics-tracker")))
 
     (with-temp-buffer
-      (metrics-tracker--make-gnuplot-config metric-names
-                                            date-grouping value-transform
-                                            start-date end-date
-                                            bin-data-all
-                                            graph-type graph-output fname)
+      ;; load metric data into bins; list of `bin-data' for each metric in the same order as `metric-names'
+      (let* ((bin-data-all (mapcar (lambda (metric-name) (metrics-tracker--bin-metric-data metric-name date-grouping value-transform today))
+                                   metric-names))
+             ;; prepare the graph data from the bin data
+             (data (metrics-tracker--compute-data bin-data-all date-grouping start-date end-date graph-type)))
+        (metrics-tracker--make-gnuplot-config metric-names data
+                                              date-grouping value-transform
+                                              graph-type graph-output fname))
       (save-current-buffer
         (metrics-tracker--setup-output-buffer)
         (fundamental-mode))
@@ -937,23 +953,18 @@ For example:
 
       (metrics-tracker--show-output-buffer))))
 
-(defun metrics-tracker--make-gnuplot-config (metric-names
+(defun metrics-tracker--make-gnuplot-config (metric-names data
                                              date-grouping value-transform
-                                             start-date end-date
-                                             bin-data-all
                                              graph-type graph-output fname)
   "Write a gnuplot config (including inline data) to the (empty) current buffer.
 METRIC-NAMES a list of metric names being plotted.
+DATA the graph data.
 DATE-GROUPING the name of the date grouping used to bin the data.
 VALUE-TRANSFORM the name of the value transform used on each bin.
-START-DATE if given, filter out occurrences before
-END-DATE if given, filter out occurrences after
-BIN-DATA-ALL a list bin-data (which is a hash of dates to values) in the same order as METRIC-NAMES.
 GRAPH-TYPE the type of graph (line, bar, scatter).
 GRAPH-OUTPUT the graph output format (ascii, svg, png).
 FNAME is the filename of the temp file to write."
-  (let (merged-dates data num-lines
-        (date-format (metrics-tracker--format-bin date-grouping))
+  (let ((date-format (metrics-tracker--format-bin date-grouping))
         (term (cond ((eq graph-output 'svg) "svg")
                     ((eq graph-output 'png) "pngcairo")
                     (t "dumb")))
@@ -962,30 +973,6 @@ FNAME is the filename of the temp file to write."
         (title (if (= 1 (length metric-names)) (car metric-names) ""))
         (fg-color (if metrics-tracker-dark-mode "grey50" "grey10"))
         (bg-color (if metrics-tracker-dark-mode "grey10" "grey90")))
-
-    ;; merge dates and sort
-    (setq merged-dates (seq-reduce (lambda (dates ii) (append (hash-table-keys ii) dates))
-                                   bin-data-all
-                                   nil))
-    (delete-dups merged-dates)
-    (setq merged-dates (metrics-tracker--sort-dates merged-dates))
-
-    ;; set table data
-    (let ((default (if (or (eq graph-type 'line) (eq graph-type 'scatter)) "." "0"))
-          date-str)
-      (dolist (date merged-dates)
-        (when (and (or (null start-date) ; only use occurrences between `start-date' and `end-date', inclusive
-                       (not (time-less-p date start-date)))
-                   (or (null end-date)
-                       (not (time-less-p end-date date))))
-          (setq date-str (if (eq date-grouping 'full)
-                             "full"
-                           (format-time-string (metrics-tracker--format-bin date-grouping) date)))
-          (setq data (cons (append (list date-str)
-                                   (mapcar (lambda (bin-data) (gethash date bin-data default)) bin-data-all))
-                           data))))
-      (setq data (reverse data))
-      (setq num-lines (1- (length (car data)))))
 
     (cond ((eq graph-output 'ascii)
            (insert (format "set term %s size %d, %d\n\n" term width height))
@@ -1025,22 +1012,22 @@ FNAME is the filename of the temp file to write."
            (insert (format "set grid ytics back ls 0 lc \"%s\"\n" fg-color))
            (if (eq graph-type 'stacked)
                (insert "set key invert\n"))))
-    (insert (metrics-tracker--define-plot graph-type graph-output num-lines metric-names) "\n")
-    (dotimes (_ii num-lines)
+    (insert (metrics-tracker--define-plot graph-type graph-output metric-names) "\n")
+    (dotimes (_ii (length metric-names))
       (if (not date-format) ; is 'full
           (insert (format ". %s\n" (mapconcat #'identity (cdar data) " ")))
         (dolist (entry data)
-          (insert (concat (mapconcat #'identity entry " ") "\n"))))
+          (insert (concat (mapconcat #'identity (nth 1 entry) " ") "\n"))))
       (insert "\ne\n"))))
 
-(defun metrics-tracker--define-plot (graph-type graph-output num-lines metric-names)
+(defun metrics-tracker--define-plot (graph-type graph-output metric-names)
   "Return the plot definition command.
 GRAPH-TYPE is one of line, bar, point
 GRAPH-OUTPUT is one of ascii, svg, png
-NUM-LINES is the number of lines to include in the plot.
 METRIC-NAMES is the list of metric names being plotted."
   (let ((plot-def "plot")
-        (colors (nth (if metrics-tracker-dark-mode 1 0) metrics-tracker-graph-colors)))
+        (colors (nth (if metrics-tracker-dark-mode 1 0) metrics-tracker-graph-colors))
+        (num-lines (length metric-names)))
     (dotimes (ii num-lines)
       (let ((dash (if (= 0 ii) "-" ""))
             (label (if (= 1 num-lines) "notitle" (format "title \"%s\"" (nth ii metric-names))))

@@ -365,7 +365,7 @@ Jan 4, 2020 run dist 2
 
    metrics-tracker.el defines several variables that can be used to customize behavior.
 
-    - metrics-tracker-named-reports :: a list of saved reports
+    - metrics-tracker-named-reports :: a list of saved reports that can be shown by name
     - metrics-tracker-dark-mode :: if ~t~, enable dark mode for image graphs
     - metrics-tracker-graph-colors :: two lists of colors to use for graph series in light mode and dark mode
     - metrics-tracker-metric-name-whitelist :: if set, read only these metrics when parsing the diary file

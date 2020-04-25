@@ -22,6 +22,7 @@
 ;; graph
 (metrics-tracker-graph-render '(("commute" "run") year percent nil nil nil stacked svg))
 (metrics-tracker-graph-render '(("commute" "run") year per-week nil nil nil line png))
+(metrics-tracker-graph-render '(("commute" "run") week total nil nil nil scatter png))
 (metrics-tracker-graph-render '(("pullups" "pushups") month per-week nil nil nil scatter ascii))
 (metrics-tracker-graph-render '(("run" "karen run dist") month total "2020-01-01" nil nil bar png))
 ;; failures
