@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.1.9
+;; Version: 0.1.10
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -93,15 +93,15 @@ Display a report from this list using `metrics-tracker-show-named-report'."
                                 (const :tag "per week" per-week) (const :tag "per month" per-month) (const :tag "per year" per-year)
                                 (const :tag "difference total" diff-total) (const :tag "difference percent" diff-percent) (const :tag "difference per day" diff-per-day)
                                 (const :tag "difference per week" diff-per-week) (const :tag "difference per month" diff-per-month) (const :tag "difference per year" diff-per-year))
-                        (choice :tag "Start Date     " (const :tag "None" nil) (string :tag "Enter YYYY-MM-DD"))
-                        (choice :tag "End Date       " (const :tag "None" nil) (string :tag "Enter YYYY-MM-DD")))
+                        (choice :tag "Start Date     " (const :tag "First occurrence" nil) (string :tag "Date string"))
+                        (choice :tag "End Date       " (const :tag "Last occurrence" nil) (string :tag "Date string")))
                   (list :tag "Calendar Report"
                         (string :tag "Report Name")
                         (const :tag "Calendar Report" cal)
                         (repeat :tag "Metric Names" string)
                         (choice :tag "Value Transform" (const total) (const count))
-                        (choice :tag "Start Date     " (const :tag "None" nil) (string :tag "Enter YYYY-MM-DD"))
-                        (choice :tag "End Date       " (const :tag "None" nil) (string :tag "Enter YYYY-MM-DD")))
+                        (choice :tag "Start Date     " (const :tag "First occurrence" nil) (string :tag "Date string"))
+                        (choice :tag "End Date       " (const :tag "Last occurrence" nil) (string :tag "Date string")))
                   (list :tag "Graph Report"
                         (string :tag "Report Name")
                         (const :tag "Graph Report" graph)
@@ -111,8 +111,8 @@ Display a report from this list using `metrics-tracker-show-named-report'."
                                 (const :tag "per week" per-week) (const :tag "per month" per-month) (const :tag "per year" per-year)
                                 (const :tag "difference total" diff-total) (const :tag "difference percent" diff-percent) (const :tag "difference per day" diff-per-day)
                                 (const :tag "difference per week" diff-per-week) (const :tag "difference per month" diff-per-month) (const :tag "difference per year" diff-per-year))
-                        (choice :tag "Start Date     " (const :tag "None" nil) (string :tag "Enter YYYY-MM-DD"))
-                        (choice :tag "End Date       " (const :tag "None" nil) (string :tag "Enter YYYY-MM-DD"))
+                        (choice :tag "Start Date     " (const :tag "First occurrence" nil) (string :tag "Date string"))
+                        (choice :tag "End Date       " (const :tag "Last occurrence" nil) (string :tag "Date string"))
                         (const :tag "Reserved" nil)
                         (choice :tag "Graph Type     " (const line) (const bar) (const stacked) (const scatter))
                         (choice :tag "Graph Output   " (const ascii) (const svg) (const png)))))
@@ -586,14 +586,19 @@ If MULTP is false, only ask for one metric, else loop until
           (setq metric-names (cons last-metric-name metric-names))))
     (reverse metric-names)))
 
+(defun metrics-tracker--ask-for-date (prompt)
+  (let ((date-str (read-string prompt)))
+    (if (string= "" date-str) nil date-str)))
+
 ;;;###autoload
 (defun metrics-tracker-table (arg)
   "Interactive way to get a tabular view of the requested metric.
-ARG is optional, but if given and it is the default argument,
-allow selection of multiple metrics.
 
 This function gets user input and then delegates to
-`metrics-tracker-table-render'."
+`metrics-tracker-table-render'.
+
+ARG is optional, but if given and it is the default argument,
+allow selection of multiple metrics and date ranges."
   (interactive "P")
 
   ;; make sure `metrics-tracker-metric-index' has been populated
@@ -601,15 +606,18 @@ This function gets user input and then delegates to
 
   (let* ((ivy-sort-functions-alist nil)
          ;; ask for params
-         (multp (equal arg '(4)))
-         (metric-names-str (metrics-tracker--ask-for-metrics multp))
+         (extrap (equal arg '(4)))
+         (metric-names-str (metrics-tracker--ask-for-metrics extrap))
          (date-grouping (intern (completing-read "Group dates by: " (metrics-tracker--presorted-options
                                                                      (metrics-tracker--date-grouping-options))
                                                  nil t nil nil "month")))
          (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
                                                                         (metrics-tracker--value-transform-options date-grouping))
-                                                   nil t nil nil "total"))))
-    (metrics-tracker-table-render (list metric-names-str date-grouping value-transform nil nil))))
+                                                   nil t nil nil "total")))
+         (start-date (and extrap (metrics-tracker--ask-for-date "Start date (optional): ")))
+         (end-date (and extrap (metrics-tracker--ask-for-date "End date (optional): "))))
+    (metrics-tracker-table-render (list metric-names-str date-grouping value-transform
+                                        start-date end-date))))
 
 ;;;###autoload
 (defun metrics-tracker-table-render (table-config)
@@ -726,24 +734,30 @@ GRAPH-TYPE is the selected graph type, if the current operation is a graph."
     (reverse data))) ; return data
 
 ;;;###autoload
-(defun metrics-tracker-cal ()
+(defun metrics-tracker-cal (arg)
   "Interactive way to get a calendar view of a requested metric.
 
 This function gets user input and then delegates to
-`metrics-tracker-cal-render'."
-  (interactive)
+`metrics-tracker-cal-render'.
+
+ARG is optional, but if given and it is the default argument,
+allow selection of date ranges."
+  (interactive "P")
 
   ;; make sure `metrics-tracker-metric-index' has been populated
   (metrics-tracker--load-index)
 
   (let* ((ivy-sort-functions-alist nil)
          ;; ask for params
+         (extrap (equal arg '(4)))
          (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
          (metric-name-str (completing-read "Metric: " (metrics-tracker--presorted-options all-metric-names) nil t))
          (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
                                                                         (metrics-tracker--value-transform-options 'day))
-                                                   nil t nil nil "total"))))
-    (metrics-tracker-cal-render (list metric-name-str value-transform))))
+                                                   nil t nil nil "total")))
+         (start-date (and extrap (metrics-tracker--ask-for-date "Start date (optional): ")))
+         (end-date (and extrap (metrics-tracker--ask-for-date "End date (optional): "))))
+    (metrics-tracker-cal-render (list metric-name-str value-transform start-date end-date))))
 
 ;;;###autoload
 (defun metrics-tracker-cal-render (cal-config)
@@ -836,11 +850,12 @@ values."
 ;;;###autoload
 (defun metrics-tracker-graph (arg)
   "Interactive way to get a graph of requested metrics.
-ARG is optional, but if given and it is the default argument,
-allow selection of multiple metrics.
 
 This function gets user input and then delegates to
-`metrics-tracker-graph-render'."
+`metrics-tracker-graph-render'.
+
+ARG is optional, but if given and it is the default argument,
+allow selection of multiple metrics and date ranges."
   (interactive "P")
 
   (metrics-tracker--check-gnuplot-exists)
@@ -850,14 +865,16 @@ This function gets user input and then delegates to
 
   (let* ((ivy-sort-functions-alist nil)
          ;; ask for params
-         (multp (equal arg '(4)))
-         (metric-names-str (metrics-tracker--ask-for-metrics multp))
+         (extrap (equal arg '(4)))
+         (metric-names-str (metrics-tracker--ask-for-metrics extrap))
          (date-grouping (intern (completing-read "Group dates by: " (metrics-tracker--presorted-options
                                                                      (metrics-tracker--date-grouping-options))
                                                  nil t nil nil "month")))
          (value-transform (intern (completing-read "Value transform: " (metrics-tracker--presorted-options
                                                                         (metrics-tracker--value-transform-options date-grouping))
                                                    nil t nil nil "total")))
+         (start-date (and extrap (metrics-tracker--ask-for-date "Start date (optional): ")))
+         (end-date (and extrap (metrics-tracker--ask-for-date "End date (optional): ")))
          (graph-type (intern (completing-read "Graph type: " (metrics-tracker--presorted-options
                                                               (metrics-tracker--graph-options date-grouping))
                                               nil t)))
@@ -866,7 +883,7 @@ This function gets user input and then delegates to
                                                 nil t nil nil "ascii"))))
 
     (metrics-tracker-graph-render (list metric-names-str date-grouping value-transform
-                                        nil nil nil graph-type graph-output))))
+                                        start-date end-date nil graph-type graph-output))))
 
 ;;;###autoload
 (defun metrics-tracker-graph-render (graph-config)

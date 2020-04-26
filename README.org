@@ -47,7 +47,7 @@
 **** diary entry format
 
     emacs is very loose on [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Format-of-Diary-File.html#Format-of-Diary-File][diary entry formatting]], but entries that
-    metrics-tracker.el uses must look like:
+    metrics-tracker uses must look like:
 
 #+BEGIN_SRC
     [date] [time] [metric-name] [value]
@@ -55,16 +55,16 @@
 
     where,
     - date :: the date of a particular day.  although the emacs diary
-             allows dates like "wednesday," which applies to all
-             wednesdays, metrics-tracker.el only uses dates for specific days.
-             some examples of valid dates are:
+              allows dates like "wednesday," which apply to all
+              wednesdays, metrics-tracker only uses dates for specific
+              days.  some examples of valid dates are:
       - ~2019-12-31~
       - ~31 Dec 2019~
       - ~December 31, 2019~
       - ~31/Dec/2019~
     - time :: the time of day is optional and ignored by
-             metrics-tracker.el if it is provided.  if provided, it
-             must be formatted as:
+              metrics-tracker if it is provided.  if provided, it must
+              be formatted as:
       - ~10:30~
       - ~10:30a~
       - ~10:30 a~
@@ -75,12 +75,12 @@
       - ~pushups~
       - ~watched tv~
     - value :: is a number (integer or decimal) or a duration
-               (hh:mm:ss.ss).  for number values, metrics-tracker.el
+               (hh:mm:ss.ss).  for number values, metrics-tracker
                doesn't care about units.  ~value~ is just a number.
                if you're tracking how much tv you watch, a "4" could
                mean 4 shows or 4 hours; it's up to you.  do not
                include commas.  for duration values, hours and
-               fractional seconds are optional.  metrics-tracker.el
+               fractional seconds are optional.  metrics-tracker
                converts durations to decimal hours.  valid values may
                be:
       - ~40~
@@ -107,7 +107,7 @@ Jan 4, 2020 run dist 2
 
 **** whitelist / blacklist
 
-    by default metrics-tracker.el will pick up any diary entries that match
+    by default metrics-tracker will pick up any diary entries that match
     the format it is looking for, which means it might pick up entries
     you don't want in your report.  if there are a few metrics that
     get picked up that you don't want to see, you can exclude them by
@@ -119,7 +119,7 @@ Jan 4, 2020 run dist 2
    '("run time" "run dist")
 #+end_SRC
 
-    if metrics-tracker.el picks up lots of metrics that you don't want to see,
+    if metrics-tracker picks up lots of metrics that you don't want to see,
     you could instead whitelist the ones you want by adding them to
     the ~metrics-tracker-metric-names-whitelist~ custom variable.  this uses
     the same format as ~metrics-tracker-metric-names-blacklist~.  if you
@@ -128,7 +128,7 @@ Jan 4, 2020 run dist 2
 
 *** reporting
 
-    metrics-tracker.el provides the following ways to view the metrics data in
+    metrics-tracker provides the following ways to view the metrics data in
     your diary.
 
 **** list all metrics
@@ -207,16 +207,23 @@ Jan 4, 2020 run dist 2
   2019         30.4
 #+END_SRC
 
-    if you want to view multiple metrics, pass an argument to the
-    ~metrics-tracker-table~ command.
-
     @@html:<kbd>@@C-u@@html:</kbd>@@ @@html:<kbd>@@M-x@@html:</kbd>@@
     ~metrics-tracker-table~
 
-    when an argument is given, emacs will prompt for metrics names
-    until ~no more~ is given.  all selected metrics will be rendered
-    in the same table.  all other options are the same as in the
-    single metric case.
+    if invoked with the universal argument (as above), metrics-tracker
+    takes a few extra options.  instead of a single metric name, emacs
+    will continue to accept metric names until ~no more~ is given.
+    all selected metrics will be added to in the same table.  all
+    other options are the same as in the single metric case.
+
+    emacs will also prompt for these input parameters:
+
+    - start-date :: the date for a specific day, formatted any way
+                    emacs diary accepts.  any day before this day will
+                    be filtered out of the report.
+    - end-date :: the date for a specific day, formatted any way emacs
+                  diary accepts.  any day after this day will be
+                  filtered out of the report.
 
 **** show calendar view
 
@@ -251,14 +258,19 @@ Jan 4, 2020 run dist 2
 
 #+END_SRC
 
-    ~metrics-tracker-cal~ only supports one metric at a time.
+    @@html:<kbd>@@C-u@@html:</kbd>@@ @@html:<kbd>@@M-x@@html:</kbd>@@
+    ~metrics-tracker-cal~
+
+    if invoked with the universal argument (as above), metrics-tracker
+    takes a few extra options.  ~metrics-tracker-cal~ only supports
+    one metric at a time, but it will accept ~start-date~ and
+    ~end-date~, as in ~metrics-tracker-table~.
 
 **** draw graphs
 
-    metrics-tracker.el can take the same table data and use it to generate a
-    graph.  it uses gnuplot for graph generation, so gnuplot must be
-    installed on your system and available on your PATH.  I tested
-    with gnuplot 5.0.
+    metrics-tracker can generate graphs from metric data.  it uses
+    gnuplot for graph generation, so gnuplot must be installed on your
+    system and available on your ~PATH~.  I tested with gnuplot 5.0.
 
     @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-graph~
 
@@ -313,16 +325,14 @@ Jan 4, 2020 run dist 2
     the size of the image can be set by modifying the variable
     ~metrics-tracker-graph-size~.
 
-    if you want to plot multiple metrics, pass an argument to the
-    ~metrics-tracker-graph~ command.
-
     @@html:<kbd>@@C-u@@html:</kbd>@@ @@html:<kbd>@@M-x@@html:</kbd>@@
     ~metrics-tracker-graph~
 
-    when an argument is given, emacs will prompt for metrics names
-    until ~no more~ is given.  all selected metrics will be plotted on
-    the same axis. all other plot options are the same as in the
-    single metric case.
+    if invoked with the universal argument, metrics-tracker takes a
+    few extra options.  instead of a single metrics name, emacs will
+    continue to accept metric names until ~no more~ is given.  all
+    selected metrics will be added to the same graph.  emacs will also
+    prompt for ~start-date~ and ~end-date~ to bound the data.
 
     this example shows the percentage of days I bike commuted or
     ran by year, as a stacked graph, with dark mode enabled:
@@ -363,7 +373,7 @@ Jan 4, 2020 run dist 2
 
 ** customization
 
-   metrics-tracker.el defines several variables that can be used to customize behavior.
+   metrics-tracker defines several variables that can be used to customize behavior.
 
     - metrics-tracker-named-reports :: a list of saved reports that can be shown by name
     - metrics-tracker-dark-mode :: if ~t~, enable dark mode for image graphs

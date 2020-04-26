@@ -20,7 +20,8 @@
 (metrics-tracker-cal-render '("emacs-tracker" fail nil nil))
 
 ;; graph
-(metrics-tracker-graph-render '(("commute" "run") year percent nil nil nil stacked svg))
+(metrics-tracker-graph-render '(("commute" "run") year percent nil nil nil stacked png))
+(metrics-tracker-graph-render '(("commute") year percent nil nil nil bar svg))
 (metrics-tracker-graph-render '(("commute" "run") year per-week nil nil nil line png))
 (metrics-tracker-graph-render '(("commute" "run") week total nil nil nil scatter png))
 (metrics-tracker-graph-render '(("pullups" "pushups") month per-week nil nil nil scatter ascii))
@@ -33,3 +34,10 @@
 (metrics-tracker-graph-render '(("commute" "run") full total nil nil nil fail svg))
 (metrics-tracker-graph-render '(("commute" "run") full total nil nil nil bar fail))
 (metrics-tracker-graph-render '(("commute" "run") full total nil nil nil line svg))
+
+;; readme reports
+(metrics-tracker-table-render '(("beer") year percent nil nil nil))
+(metrics-tracker-cal-render '("emacs-tracker" total "2019-12-01" "2019-12-30"))
+(metrics-tracker-graph-render '(("commute") year per-week nil nil nil line ascii))
+(metrics-tracker-graph-render '(("commute") week total nil nil nil scatter png))
+(metrics-tracker-graph-render '(("commute" "run") year percent nil nil nil stacked png)) ; dark mode
