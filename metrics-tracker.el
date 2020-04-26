@@ -966,7 +966,7 @@ GRAPH-OUTPUT the graph output format (ascii, svg, png).
 FNAME is the filename of the temp file to write."
   (let ((date-format (metrics-tracker--format-bin date-grouping))
         (term (cond ((eq graph-output 'svg) "svg")
-                    ((eq graph-output 'png) "pngcairo")
+                    ((eq graph-output 'png) "pngcairo font \"Arial,10\"")
                     (t "dumb")))
         (width (if (eq graph-output 'ascii) (1- (window-width)) (car metrics-tracker-graph-size)))
         (height (if (eq graph-output 'ascii) (1- (window-height)) (cdr metrics-tracker-graph-size)))
@@ -1004,7 +1004,7 @@ FNAME is the filename of the temp file to write."
           ((or (eq graph-type 'bar)
                (eq graph-type 'stacked))
            (insert "set xtics rotate\n")
-           (insert "set boxwidth 0.9 relative\n")
+           (insert (format "set boxwidth %f relative\n" (if (eq graph-type 'bar) 1.0 0.6)))
            (insert "set style data histogram\n")
            (insert (format "set style histogram %s\n"
                            (if (eq graph-type 'bar) "cluster" "rowstacked")))
