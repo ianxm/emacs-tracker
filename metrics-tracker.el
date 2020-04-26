@@ -148,7 +148,7 @@ the diary file to be re-read if the data is needed again.")
   `(if (time-less-p ,d1 ,d2) ,d2 ,d1))
 
 (defun metrics-tracker--string-to-time (&optional date-str)
-  "Convert the optional DATE-STR to a time value, or return a time value for today.
+  "Return a time value for DATE-STR if given, else for today.
 Returned a time value with hours, minutes, seconds zeroed out."
   (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                (seq-take (parse-time-string (or date-str (format-time-string "%F"))) 6))))
@@ -587,6 +587,7 @@ If MULTP is false, only ask for one metric, else loop until
     (reverse metric-names)))
 
 (defun metrics-tracker--ask-for-date (prompt)
+  "Display the PROMPT, return the response or nil if no response given."
   (let ((date-str (read-string prompt)))
     (if (string= "" date-str) nil date-str)))
 
@@ -816,8 +817,9 @@ For example:
            (end-year (nth 5 end-decoded)))
       (insert (format "  %s\n\n" (symbol-name metric-name)))
       (put-text-property (point-min) (point-max) 'face 'bold)
-      (while (or (<= month end-month)
-                 (< year end-year))
+      (while (or (< year end-year)
+                 (and (= year end-year)
+                      (<= month end-month)))
         (metrics-tracker--print-month month year bin-data first end)
         (insert "\n\n\n")
         (setq month (1+ month))
