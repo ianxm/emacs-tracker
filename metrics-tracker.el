@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.1.10
+;; Version: 0.1.11
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -93,15 +93,15 @@ Display a report from this list using `metrics-tracker-show-named-report'."
                                 (const :tag "per week" per-week) (const :tag "per month" per-month) (const :tag "per year" per-year)
                                 (const :tag "difference total" diff-total) (const :tag "difference percent" diff-percent) (const :tag "difference per day" diff-per-day)
                                 (const :tag "difference per week" diff-per-week) (const :tag "difference per month" diff-per-month) (const :tag "difference per year" diff-per-year))
-                        (choice :tag "Start Date     " (const :tag "First occurrence" nil) (string :tag "Date string"))
-                        (choice :tag "End Date       " (const :tag "Last occurrence" nil) (string :tag "Date string")))
+                        (choice :tag "Start Date     " (const :tag "first occurrence" nil) (string :tag "date string"))
+                        (choice :tag "End Date       " (const :tag "last occurrence" nil) (string :tag "date string")))
                   (list :tag "Calendar Report"
                         (string :tag "Report Name")
                         (const :tag "Calendar Report" cal)
                         (repeat :tag "Metric Names" string)
                         (choice :tag "Value Transform" (const total) (const count))
-                        (choice :tag "Start Date     " (const :tag "First occurrence" nil) (string :tag "Date string"))
-                        (choice :tag "End Date       " (const :tag "Last occurrence" nil) (string :tag "Date string")))
+                        (choice :tag "Start Date     " (const :tag "first occurrence" nil) (string :tag "date string"))
+                        (choice :tag "End Date       " (const :tag "last occurrence" nil) (string :tag "date string")))
                   (list :tag "Graph Report"
                         (string :tag "Report Name")
                         (const :tag "Graph Report" graph)
@@ -111,8 +111,8 @@ Display a report from this list using `metrics-tracker-show-named-report'."
                                 (const :tag "per week" per-week) (const :tag "per month" per-month) (const :tag "per year" per-year)
                                 (const :tag "difference total" diff-total) (const :tag "difference percent" diff-percent) (const :tag "difference per day" diff-per-day)
                                 (const :tag "difference per week" diff-per-week) (const :tag "difference per month" diff-per-month) (const :tag "difference per year" diff-per-year))
-                        (choice :tag "Start Date     " (const :tag "First occurrence" nil) (string :tag "Date string"))
-                        (choice :tag "End Date       " (const :tag "Last occurrence" nil) (string :tag "Date string"))
+                        (choice :tag "Start Date     " (const :tag "first occurrence" nil) (string :tag "date string"))
+                        (choice :tag "End Date       " (const :tag "last occurrence" nil) (string :tag "date string"))
                         (const :tag "Reserved" nil)
                         (choice :tag "Graph Type     " (const line) (const bar) (const stacked) (const scatter))
                         (choice :tag "Graph Output   " (const ascii) (const svg) (const png)))))
@@ -519,7 +519,7 @@ ALLOW-GAPS-P is t, don't fill in gaps."
     (if (eq date-grouping 'full)
         (let ((write-value (gethash 'full bin-data)))
           (puthash 'full
-                   (metrics-tracker--bin-to-val (format "%s" (/ (round (* write-value 100)) 100.0))
+                   (metrics-tracker--bin-to-val (format "%g" (/ (round (* write-value 100)) 100.0))
                                                 value-transform date-grouping
                                                 'full first-date today)
                    bin-data))
@@ -546,7 +546,7 @@ ALLOW-GAPS-P is t, don't fill in gaps."
               (setq write-value current-value))
 
             (puthash current-date-bin
-                     (format "%s" (/ (round (* write-value 100)) 100.0))
+                     (format "%g" (/ (round (* write-value 100)) 100.0))
                      bin-data)) ; replace number with a string
           (setq last-value current-value
                 current-date-bin (metrics-tracker--date-to-next-bin current-date-bin date-grouping))))) ; increment to next bin
@@ -758,28 +758,28 @@ allow selection of date ranges."
                                                    nil t nil nil "total")))
          (start-date (and extrap (metrics-tracker--ask-for-date "Start date (optional): ")))
          (end-date (and extrap (metrics-tracker--ask-for-date "End date (optional): "))))
-    (metrics-tracker-cal-render (list metric-name-str value-transform start-date end-date))))
+    (metrics-tracker-cal-render (list (list metric-name-str) value-transform start-date end-date))))
 
 ;;;###autoload
 (defun metrics-tracker-cal-render (cal-config)
   "Programmatic way to get a calendar view of a requested metric.
 
 CAL-CONFIG should be a list of all inputs needed to generate the calendar.
-The first item in the list is a metric name as a string.
+The first item in the list is a list of metric names as strings.  only the first is used.
 The second item is a value transform as a symbol.
 The third item (optional) is a date string, ignore occurrences before.
 The fourth item (optional) is a date string, ignore occurrences after.
 Date strings must be in YYYY-MM-DD format.
 
 For example:
-    '(\"metricname\" total nil nil)"
+    '((\"metricname\") total nil nil)"
 
   ;; make sure `metrics-tracker-metric-index' has been populated
   (metrics-tracker--load-index)
 
   (let* ((today (metrics-tracker--string-to-time))
          (all-metric-names (mapcar (lambda (metric) (nth 0 metric)) metrics-tracker-metric-index))
-         (metric-name (intern (nth 0 cal-config) metrics-tracker-metric-names))
+         (metric-name (intern (caar cal-config) metrics-tracker-metric-names))
          (value-transform (nth 1 cal-config))
          (start-date (and (nth 2 cal-config)
                           (metrics-tracker--string-to-time (nth 2 cal-config))))

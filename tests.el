@@ -13,11 +13,11 @@
 (metrics-tracker-table-render '(("commute") month total "2016-01-01" "2015-01-01")) ; reverse date range
 
 ;; cal
-(metrics-tracker-cal-render '("emacs-tracker" total nil nil))
-(metrics-tracker-cal-render '("emacs-tracker" total "2020-04-01" nil))
+(metrics-tracker-cal-render '(("emacs-tracker") total nil nil))
+(metrics-tracker-cal-render '(("emacs-tracker") total "2020-04-01" nil))
 ;; failures
-(metrics-tracker-cal-render '("fail" fail nil nil))
-(metrics-tracker-cal-render '("emacs-tracker" fail nil nil))
+(metrics-tracker-cal-render '(("fail") fail nil nil))
+(metrics-tracker-cal-render '(("emacs-tracker") fail nil nil))
 
 ;; graph
 (metrics-tracker-graph-render '(("commute" "run") year percent nil nil nil stacked png))

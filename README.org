@@ -8,24 +8,25 @@
    which you can use to keep track of which things you do on which
    days.
 
-   [[https://github.com/ianxm/emacs-tracker][metrics-tracker.el]] gives emacs the capability to generate tables and charts
-   from the personal metrics data found in your diary entries.
+   with [[https://github.com/ianxm/emacs-tracker][metrics-tracker]], emacs can generate tables and graphs from the
+   personal metrics data found in your diary entries.
 
-   using metrics-tracker.el, you can use your emacs diary to track daily
-   personal metrics.  each metric is a count of something per day.  the
-   point is to measure behaviors that you are trying to increase (like
-   exercise) or decrease (like watching buffy the vampire slayer) so
-   that you can see if you are making progress toward that goal.
+   using metrics-tracker, you can use your emacs diary to track daily
+   personal metrics.  each metric is a count of something per day.
+   the point is to measure behaviors that you are trying to increase
+   (like exercise) or decrease (like watching buffy the vampire
+   slayer) so that you can see if you are making progress toward that
+   goal.
 
    this is a port of [[https://github.com/ianxm/tracker][tracker]].
 
 ** installation
 
-** melpa
+*** melpa
 
    1. run @@html:<kbd>@@M-x@@html:</kbd>@@ ~package-install~ @@html:<kbd>@@RET@@html:</kbd>@@ ~metrics-tracker~
 
-** manual install
+*** manual install
 
    1. download [[https://raw.github.com/ianxm/emacs-tracker/master/metrics-tracker.el][metrics-tracker.el]]
    2. run @@html:<kbd>@@M-x@@html:</kbd>@@ ~package-install-file~ @@html:<kbd>@@RET@@html:</kbd>@@
@@ -35,11 +36,11 @@
 
 *** entering metrics data
 
-    metrics entries are regular diary entries so they can be created by
-    updating the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Diary.html][emacs diary]] in the normal way, but diary entries that
-    aren't in a certain format will be ignored by metrics-tracker.
-    metric-tracker reads diary entries from the file pointed to by the
-    ~diary-file~ variable.
+    metrics entries are regular emacs diary entries so they can be
+    created by updating the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Diary.html][emacs diary]] in the normal way, but diary
+    entries that aren't in a certain format will be ignored by
+    metrics-tracker.  metric-tracker reads diary entries from the file
+    pointed to by the ~diary-file~ variable.
 
     tip: consider using abbrev mode in diary mode and setting
     abbreviations for your metrics to save yourself a few keystrokes.
@@ -197,14 +198,15 @@ Jan 4, 2020 run dist 2
 
 #+BEGIN_SRC
   year ▼       beer percent
-  2012         54.0
-  2013         48.2
-  2014         58.6
-  2015         59.5
-  2016         50.7
-  2017         39.5
-  2018         35.3
-  2019         30.4
+  2012         54.04
+  2013         48.22
+  2014         58.63
+  2015         59.45
+  2016         50.68
+  2017         39.45
+  2018         35.34
+  2019         30.41
+  2020         21.01
 #+END_SRC
 
     @@html:<kbd>@@C-u@@html:</kbd>@@ @@html:<kbd>@@M-x@@html:</kbd>@@
@@ -224,47 +226,6 @@ Jan 4, 2020 run dist 2
     - end-date :: the date for a specific day, formatted any way emacs
                   diary accepts.  any day after this day will be
                   filtered out of the report.
-
-**** show calendar view
-
-     @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-cal~
-
-    emacs can extract the data for a metric and render it onto a
-    calendar.  the number at each calendar position is one of:
-    - period :: no metric was recorded on this day
-    - underscore :: before first metric occurrence or after current
-                    date
-    - number :: the value for the day
-
-    emacs will prompt for the following input parameters:
-    - metric-name :: the metric name
-    - value-transform :: how to transform the data. one of:
-      - total :: total for the day
-      - count :: count entries for the day
-
-    here's an example, showing hours of coding on this project
-
-#+BEGIN_SRC
-  emacs-tracker
-
-                    Dec 2019
-
-    Su    Mo    Tu    We    Th    Fr    Sa
-       .     .     .     .     .     .     .
-       3     .     6     .     4     2     .
-       .     4     2     2     .     .     .
-       1     1     .     1     .     .     4
-       .     _     _
-
-#+END_SRC
-
-    @@html:<kbd>@@C-u@@html:</kbd>@@ @@html:<kbd>@@M-x@@html:</kbd>@@
-    ~metrics-tracker-cal~
-
-    if invoked with the universal argument (as above), metrics-tracker
-    takes a few extra options.  ~metrics-tracker-cal~ only supports
-    one metric at a time, but it will accept ~start-date~ and
-    ~end-date~, as in ~metrics-tracker-table~.
 
 **** draw graphs
 
@@ -320,7 +281,7 @@ Jan 4, 2020 run dist 2
     for each week and renders it as a scatter plot written as a png
     image.
 
-    [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/commute_by_week.png]]
+    [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/commute_by_week_1.png]]
 
     the size of the image can be set by modifying the variable
     ~metrics-tracker-graph-size~.
@@ -332,16 +293,58 @@ Jan 4, 2020 run dist 2
     few extra options.  instead of a single metrics name, emacs will
     continue to accept metric names until ~no more~ is given.  all
     selected metrics will be added to the same graph.  emacs will also
-    prompt for ~start-date~ and ~end-date~ to bound the data.
+    prompt for ~start-date~ and ~end-date~ to bound the data.  for
+    details on these parameters, see ~metrics-tracker-table~.
 
-    this example shows the percentage of days I bike commuted or
-    ran by year, as a stacked graph, with dark mode enabled:
+    this example shows the percentage of days on which I bike commuted
+    or ran by year, as a stacked graph, with dark mode enabled:
 
-    [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/commute_run_by_year.png]]
+    [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/commute_run_by_year_1.png]]
 
     the colors used for each series in the graph can be customized
     using the ~metrics-tracker-graph-colors~ custom variable, which
     contains a list of colors specified as hex values.
+
+**** show calendar view
+
+     @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-cal~
+
+    metrics-tracker can render metric data onto a calendar.  the
+    number at each date position is one of:
+    - period :: no metric was recorded on this day
+    - underscore :: before first metric occurrence or after last one
+    - number :: the value for the day
+
+    emacs will prompt for the following input parameters:
+    - metric-name :: the metric name
+    - value-transform :: how to transform the data. one of:
+      - total :: total for the day
+      - count :: count entries for the day
+
+    here's an example, showing hours of coding on this project
+
+#+BEGIN_SRC
+  emacs-tracker
+
+                    Dec 2019
+
+    Su    Mo    Tu    We    Th    Fr    Sa
+       .     .     .     .     .     .     .
+       3     .     6     .     4     2     .
+       .     4     2     2     .     .     .
+       1     1     .     1     .     .     4
+       .     _     _
+
+#+END_SRC
+
+    @@html:<kbd>@@C-u@@html:</kbd>@@ @@html:<kbd>@@M-x@@html:</kbd>@@
+    ~metrics-tracker-cal~
+
+    if invoked with the universal argument (as above), metrics-tracker
+    takes a few extra options.  ~metrics-tracker-cal~ only supports
+    one metric at a time, but it will accept ~start-date~ and
+    ~end-date~.  for details on these parameters, see
+    ~metrics-tracker-table~.
 
 **** named reports
 
@@ -361,7 +364,7 @@ Jan 4, 2020 run dist 2
 
      this is what it looks like in the emacs customize ui.
 
-     [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/metrics_tracker_named_reports.png]]
+     [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/metrics_tracker_named_reports_1.png]]
 
      you can display a named report by running
 
@@ -373,7 +376,8 @@ Jan 4, 2020 run dist 2
 
 ** customization
 
-   metrics-tracker defines several variables that can be used to customize behavior.
+   metrics-tracker defines several variables that can be used to
+   customize behavior.  all of these have been mentioned above.
 
     - metrics-tracker-named-reports :: a list of saved reports that can be shown by name
     - metrics-tracker-dark-mode :: if ~t~, enable dark mode for image graphs
