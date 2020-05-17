@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.3.0
+;; Version: 0.3.1
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -378,16 +378,16 @@ days since the last occurrence of any base metric."
 ; public
 
 ;;;###autoload
-(defun metrics-tracker-list ()
-  "Display a list of all saved metrics in the output buffer.
+(defun metrics-tracker-index ()
+  "Display a list of all saved metrics along with some useful stats about each.
 
 This reads the diary file.
 
-Derived metrics are counted every time one of their base metrics
-occurs.  If multiple base metrics occur on the same day, this
-will count it multiple times.  That's fine when base metrics are
-separate terms ($1+$2) but not when they're part of the same
-term ($1/$2)."
+Note that derived metrics are counted every time one of their
+base metrics occurs.  If multiple base metrics occur on the same
+day, this will count it multiple times.  That's fine when base
+metrics are separate terms ($1+$2) but not when they're part of
+the same term ($1/$2)."
   (interactive)
 
   (metrics-tracker--load-index)

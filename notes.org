@@ -4,50 +4,41 @@
    list of metric dependencies, taken from customize.
 
 #+NAME: dep
-| derived metric       | depends on            |
-|----------------------+-----------------------|
-| elisp coding         | emacs-tracker         |
-| elisp coding         | emacs-uml             |
-| elisp coding         | emacs-cloudsync       |
-| elisp coding         | emacs-scrum           |
-| karen elliptical mph | karen elliptical dist |
-| karen elliptical mph | karen elliptical time |
-| ian elliptical mph   | ian elliptical dist   |
-| ian elliptical mph   | ian elliptical time   |
-| coding               | elisp coding          |
-| coding               | tracker               |
-| coding               | gulch                 |
-| coding               | droid-tracker         |
-| coding               | quoted                |
-| coding               | club email            |
-| coding               | graphbug              |
-| coding               | justtapped            |
-| coding               | settleup              |
-| coding               | hiddenmessage         |
-| cycling              | commute               |
-| cycling              | joyride               |
-| cardio work          | ian elliptical dist   |
-| cardio work          | cycling               |
-| weights              | curls                 |
-| weights              | tris                  |
-| weights              | shoulders             |
-| weights              | fly                   |
-| weights              | bench                 |
-| abs                  | situps                |
-| abs                  | crunches              |
-| abs                  | plank                 |
-| abs                  | ab circuit            |
-| calisthenics         | dips                  |
-| calisthenics         | spullups              |
-| calisthenics         | pullups               |
-| calisthenics         | chinups               |
-| calisthenics         | pushups               |
-| workout              | weights               |
-| workout              | abs                   |
-| workout              | calisthenics          |
-| drinks               | beer                  |
-| drinks               | wine                  |
-| drinks               | shots                 |
+| derived metric | depends on      |
+|----------------+-----------------|
+| elisp coding   | emacs-tracker   |
+| elisp coding   | emacs-uml       |
+| elisp coding   | emacs-cloudsync |
+| elisp coding   | emacs-scrum     |
+| elliptical mph | elliptical dist |
+| elliptical mph | elliptical time |
+| coding         | elisp coding    |
+| coding         | tracker         |
+| coding         | droid-tracker   |
+| coding         | graphbug        |
+| coding         | justtapped      |
+| cycling        | commute         |
+| cycling        | joyride         |
+| cardio effort  | elliptical dist |
+| cardio effort  | cycling         |
+| weights        | curls           |
+| weights        | tris            |
+| weights        | shoulders       |
+| weights        | fly             |
+| weights        | bench           |
+| abs            | situps          |
+| abs            | crunches        |
+| abs            | planks          |
+| calisthenics   | dips            |
+| calisthenics   | pullups         |
+| calisthenics   | chinups         |
+| calisthenics   | pushups         |
+| workout        | weights         |
+| workout        | abs             |
+| workout        | calisthenics    |
+| drinks         | beer            |
+| drinks         | wine            |
+| drinks         | shots           |
 
 ** format dependencies
 
@@ -79,7 +70,7 @@ digraph {
 #+NAME: examples
 | no | name                                                | reason                        | definition                                                                                           |
 |----+-----------------------------------------------------+-------------------------------+------------------------------------------------------------------------------------------------------|
-|  0 | list of metrics                                     | list                          | (metrics-tracker-list)                                                                               |
+|  0 | metrics index                                       | index                         | (metrics-tracker-index)                                                                              |
 |  1 | derived metrics config                              | config derived                | (customize-group "metrics-tracker")                                                                  |
 |  2 | named reports config                                | config named                  | (customize-group "metrics-tracker")                                                                  |
 |  3 | bar graph of percent of days by year                | bar graph, all are derived    | (metrics-tracker-graph-render '(("drinks" "workout" "coding") year percent nil nil bar svg))         |
@@ -134,6 +125,8 @@ digraph {
 - ./img/3_bar_60pct.png
 - ./img/4_line_20pct.png
 - ./img/4_line_60pct.png
+- ./img/0_index_20pct.png
+- ./img/0_index_60pct.png
 - ./img/9_cal_20pct.png
 - ./img/9_cal_60pct.png
 - ./img/2_config_named_20pct.png
@@ -175,10 +168,10 @@ digraph {
     echo $remote
   }
 
-  # for file in $thumbs; do
-  #   upload $file
-  # done
-  # upload $anim
+  for file in $thumbs; do
+    upload $file
+  done
+  upload $anim
   upload "./img/depgraph.png"
 #+END_SRC
 

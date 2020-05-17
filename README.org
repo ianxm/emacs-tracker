@@ -220,13 +220,13 @@ Jan 4, 2020 run dist 2
      - svg
      - png
 
-*** metrics list report
+*** index report
 
-    @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-list~
+    @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-index~
 
     this creates a table containing all of the metrics found in your
-    emacs diary.  the list report is like a dashboard.  it gives you a
-    broad overview of everything you're tracking.
+    emacs diary.  the index is like a dashboard.  it gives you a broad
+    overview of everything you're tracking.
 
     by default it is sorted by recency.  I find it useful to glance
     down the list occasionally to see the metrics I've been away from
@@ -236,7 +236,7 @@ Jan 4, 2020 run dist 2
     another column and hitting ~S~.  the arrow in the header indicates
     the sort column and direction.
 
-    the list report has the following columns:
+    the index report has the following columns:
     - metric :: the metric name
     - days ago :: the number of days since "last"
     - first :: the date of the first entry
@@ -443,8 +443,8 @@ Jan 4, 2020 run dist 2
   these are descriptions of the screenshots in the gif slideshow in
   the overview section.
 
-  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/0_list_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/0_list_20pct_v2.png]] ::  this
-       is a metric list report.  it lists all metrics found in the
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/0_index_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/0_index_20pct_v2.png]] ::  this
+       is a metric index report.  it lists all metrics found in the
        diary (base metrics as well as derived metrics) along with some
        useful stats about each.
 
