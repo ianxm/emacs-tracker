@@ -13,14 +13,21 @@
 
   using metrics-tracker, you can use your emacs diary to track daily
   personal metrics.  each metric is a count of something per day.
-  the point is to measure behaviors that you are trying to increase
+  the point is to measure behaviors that you would like to increase
   (like exercise) or decrease (like watching buffy the vampire
   slayer) so that you can see if you are making progress toward that
   goal.
 
-  this is a port of [[https://github.com/ianxm/tracker][tracker]].
+  in addition to the metrics you enter, metrics-tracker can compute
+  metrics derived from your base metrics or other derived metrics
+  using arbitrary mathematical expressions.
 
-  [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/animation_1.gif]]
+  each of these screenshots is described in the gallery section later
+  in this document.
+
+  [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/animation_v2.gif]]
+
+  this is a port of [[https://github.com/ianxm/tracker][tracker]].
 
 * installation
 
@@ -35,7 +42,6 @@
   3. choose ~metrics-tracker.el~
 
 * usage
-
 ** entering metrics data
 
    metrics entries are regular emacs diary entries so they can be
@@ -60,7 +66,9 @@
     - date :: the date of a particular day.  although the emacs diary
               allows dates like "wednesday," which apply to all
               wednesdays, metrics-tracker only uses dates for specific
-              days.  some examples of valid dates are:
+              days.  date strings can be in any format
+              ~parse-time-string~ can use.  some examples of valid
+              dates are:
       - ~2019-12-31~
       - ~31 Dec 2019~
       - ~December 31, 2019~
@@ -134,103 +142,135 @@ Jan 4, 2020 run dist 2
    metrics-tracker provides several ways to extract information from
    the metrics data in your diary.
 
-*** list metrics report
+*** standard options
+
+    reports are configured with several options.
+
+**** metric name
+
+     metric name tells metric-tracker the name of the metric or
+     metrics to include in the current report.  ~cal~ reports can only
+     use one metric, but ~table~ and ~graph~ reports can combine
+     multiple.
+
+**** date grouping
+
+     date grouping tells metrics-tracker how many days to clump
+     together.  in a graph, this is the x axis.
+
+     possible choices:
+     - day
+     - week
+     - month
+     - year
+     - full
+
+**** value transform
+
+     the value transform tells metrics-tracker what the value at each
+     date grouping should mean.  this controls how entries within
+     each date grouping are combined and transformed.
+
+     possible choices:
+     - total :: sum all of the values in the date grouping
+     - count :: count entries in the date grouping
+     - min :: the minimum of all values in a date grouping
+     - max :: the maximum of all values in a date grouping
+     - avg :: the average of all values in a date grouping
+     - percent :: percent of days within the date grouping with an entry
+     - per-day :: the average value for each day in the date grouping
+     - per-week :: the average value for each week in the date grouping
+     - per-month :: the average value for each month in the date grouping
+     - per-year :: the average value for each year in the date grouping
+     - diff-total :: the difference of ~total~ from one date grouping to the next
+     - diff-count :: the difference of ~count~ from one date grouping to the next
+     - diff-min :: the difference of ~min~ from one date grouping to the next
+     - diff-max :: the difference of ~max~ from one date grouping to the next
+     - diff-avg :: the difference of ~avg~ from one date grouping to the next
+     - diff-percent :: the difference of ~percent~ from one date grouping to the next
+     - diff-per-day :: the difference of ~per-day~ from one date grouping to the next
+     - diff-per-week :: the difference of ~per-week~ from one date grouping to the next
+     - diff-per-month :: the difference of ~per-month~ from one date grouping to the next
+     - diff-per-year :: the difference of ~per-year~ from one date grouping to the next
+
+**** date range
+
+     it is possible to restrict reports to specified date ranges.  you
+     can specify either the start date, end date, neither, or both.
+
+     as with diary entry dates, date range strings may be specified in
+     any date format ~parse-time-string~ can use.
+
+**** graph-type [graphs only]
+
+     metrics-tracker can present metrics data using various graph types.
+
+     possible choices:
+     - line
+     - bar
+     - stacked
+     - scatter
+
+**** graph-output [graphs only]
+
+     the graph output option specifies the file format for the graph.
+
+     possible choices:
+     - ascii
+     - svg
+     - png
+
+*** metrics list report
 
     @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-list~
 
     this creates a table containing all of the metrics found in your
-    emacs diary.
+    emacs diary.  the list report is like a dashboard.  it gives you a
+    broad overview of everything you're tracking.
 
-    the table can be sorted by any column by moving over the column
-    and hitting ~S~.  the arrow in the header indicates the sort
-    column and direction.
+    by default it is sorted by recency.  I find it useful to glance
+    down the list occasionally to see the metrics I've been away from
+    for a long time.
 
-    the table contains the following columns:
+    the sort column and direction can be changed by moving over
+    another column and hitting ~S~.  the arrow in the header indicates
+    the sort column and direction.
+
+    the list report has the following columns:
     - metric :: the metric name
     - days ago :: the number of days since "last"
     - first :: the date of the first entry
     - last :: the date of the last entry
     - count :: the number of entries for this metric
 
-    here's an example:
-
-#+BEGIN_SRC
-  metric         days ago ▼ first        last         count
-  emacs-tracker  0          2019-11-23   2019-12-28   18
-  beer           3          2012-02-13   2019-12-25   1349
-  commute        64         2006-05-22   2019-10-25   1774
-#+END_SRC
-
 *** table report
 
-     @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-table~
+    @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-table~
 
-     emacs will prompt for the following input parameters:
-    - metric-name :: the metric name
-    - date-grouping :: how many days to clump in each row. one of:
-      - day
-      - week
-      - month
-      - year
-      - full
-    - value-transform :: how to combine the data. one of:
-      - total :: sum all of the values in the ~date-grouping~
-      - count :: count entries in the ~date-grouping~
-      - percent :: percent of days within the ~date-grouping~ with an occurrence
-      - per-day :: divide the ~date-grouping~ total by the number of days in the ~date-grouping~
-      - per-week :: divide the ~date-grouping~ total by the number of weeks in the ~date-grouping~
-      - per-month :: divide the ~date-grouping~ total by the number of months in the ~date-grouping~
-      - per-year :: divide the ~date-grouping~ total by the number of years in the ~date-grouping~
-      - diff-total :: the difference of ~total~ from one ~date-grouping~ to the next
-      - diff-percent :: the difference of ~percent~ from one ~date-grouping~ to the next
-      - diff-per-day :: the difference of ~per-day~ from one ~date-grouping~ to the next
-      - diff-per-week :: the difference of ~per-week~ from one ~date-grouping~ to the next
-      - diff-per-month :: the difference of ~per-month~ from one ~date-grouping~ to the next
-      - diff-per-year :: the difference of ~per-year~ from one ~date-grouping~ to the next
+    emacs will prompt for the following input parameters:
+    - metric name
+    - date grouping
+    - value transform
 
-    this creates a table containing the transformed data for the
-    requested metric.
+    @@html:<kbd>@@C-u@@html:</kbd>@@ @@html:<kbd>@@M-x@@html:</kbd>@@
+    ~metrics-tracker-table~
+
+    with an argument, emacs will accept multiple metrics and prompt
+    for the following additional parameters:
+    - start-date
+    - end-date
+
+    table report creates a table containing the transformed data for
+    the requested metric(s).
 
     the table can be sorted by either column by moving over the column
     and hitting ~S~.  the arrow in the header indicates the sort
     column and direction.
 
-    here's an example, showing the percentage of days of each year
-    drinking a beer:
-
-#+BEGIN_SRC
-  year ▼       beer percent
-  2012         54.04
-  2013         48.22
-  2014         58.63
-  2015         59.45
-  2016         50.68
-  2017         39.45
-  2018         35.34
-  2019         30.41
-  2020         21.01
-#+END_SRC
-
-    @@html:<kbd>@@C-u@@html:</kbd>@@ @@html:<kbd>@@M-x@@html:</kbd>@@
-    ~metrics-tracker-table~
-
-    if invoked with the universal argument (as above), metrics-tracker
-    takes a few extra options.  instead of a single metric name, emacs
-    will continue to accept metric names until ~no more~ is given.
-    all selected metrics will be added to in the same table.  all
-    other options are the same as in the single metric case.
-
-    emacs will also prompt for these input parameters:
-
-    - start-date :: the date for a specific day, formatted any way
-                    emacs diary accepts.  any day before this day will
-                    be filtered out of the report.
-    - end-date :: the date for a specific day, formatted any way emacs
-                  diary accepts.  any day after this day will be
-                  filtered out of the report.
-    - expression :: arbitrary mathematical expressions that are
-                    applied to the set of values at each date bin.
-                    more details below.
+    if the date grouping is ~full~ and the report only includes one
+    metric, the result is just one value.  instead of rendering a
+    table with one value, metrics-tracker will print it in the echo
+    area.
 
 *** graph report
 
@@ -240,204 +280,218 @@ Jan 4, 2020 run dist 2
 
     @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-graph~
 
-    emacs will prompt for the same input parameters as in
-    ~metrics-tracker-table~ above, as well as:
-    - graph-type :: the type of graph to render. one of:
-      - line
-      - bar
-      - stacked
-      - scatter
-    - graph-output :: display format for the graph. one of:
-      - ascii
-      - svg
-      - png
-
-    this is an example line graph rendered in ascii of average bike
-    commute miles per week for each year:
-
-#+BEGIN_SRC org-mode
-:
-:                                      commute per week
-:
-:          50 +-+.......+........+.........+........+.........+........+.........+
-:             |         :        :         :        :         :        :         :
-:          45 |-+..*****:........:.........:........:.........:........:.........:
-:             |   *     *****    :         :        :         :        :         :
-:          40 |-+*......:....*...:.........****.....:.........:........:.........:
-:             | *       :     *  :        *:   *    :         :        :         :
-:          35 |*+.......:......*.:......**.:....*...:.........:........:.........:
-:             *         :       *:     *   :     *  :         :        :         :
-:          30 |-+.......:........******....:.....*..:.........:........:.........:
-:             |         :        :         :      * :        **        :         :
-:             |         :        :         :      * :      ** :*       :         :
-:          25 |-+.......:........:.........:.......*:...***...:.*......:.........:
-:             |         :        :         :       *: **      :  *     :         :
-:          20 |-+.......:........:.........:........**........:..*.....:.........:
-:             |         :        :         :        :         :   *    :         :
-:          15 |-+.......:........:.........:........:.........:....*********.....:
-:             |         +        +         +        +         +        +    ******
-:          10 +------------------------------------------------------------------+
-:           2006      2008     2010      2012     2014      2016     2018      2020
-:                                            year
-:
-#+END_SRC
-
-    below is an example of the same data but this one shows the total
-    for each week and renders it as a scatter plot written as a png
-    image.
-
-    [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/commute_by_week_1.png]]
-
-    the size of the image can be set by modifying the variable
-    ~metrics-tracker-graph-size~.
+    emacs will prompt for the following input parameters:
+    - metric name
+    - date grouping
+    - value transform
+    - graph-type
+    - graph-output
 
     @@html:<kbd>@@C-u@@html:</kbd>@@ @@html:<kbd>@@M-x@@html:</kbd>@@
     ~metrics-tracker-graph~
 
-    if invoked with the universal argument, metrics-tracker takes a
-    few extra options.  instead of a single metrics name, emacs will
-    continue to accept metric names until ~no more~ is given.  all
-    selected metrics will be added to the same graph.  emacs will also
-    prompt for ~start-date~ and ~end-date~ to bound the data.  for
-    details on these parameters, see ~metrics-tracker-table~.
-
-    this example shows the percentage of days on which I bike commuted
-    or ran by year, as a stacked graph, with dark mode enabled:
-
-    [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/commute_run_by_year_1.png]]
-
-    the colors used for each series in the graph can be customized
-    using the ~metrics-tracker-graph-colors~ custom variable, which
-    contains a list of colors specified as hex values.
+    with an argument, emacs will accept multiple metrics and prompt
+    for the following additional parameters:
+    - start-date
+    - end-date
 
 *** calendar report
 
-     @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-cal~
+    @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-cal~
 
     metrics-tracker can render metric data onto a calendar.  the
     number at each date position is one of:
     - period :: no metric was recorded on this day
-    - underscore :: before first metric occurrence or after last one
+    - underscore :: before first metric entry or after last one
     - number :: the value for the day
 
     emacs will prompt for the following input parameters:
-    - metric-name :: the metric name
-    - value-transform :: how to combine the data. one of:
-      - total :: total for the day
-      - count :: count entries for the day
-
-    here's an example, showing hours of coding on this project
-
-#+BEGIN_SRC
-  emacs-tracker
-
-                    Dec 2019
-
-    Su    Mo    Tu    We    Th    Fr    Sa
-       .     .     .     .     .     .     .
-       3     .     6     .     4     2     .
-       .     4     2     2     .     .     .
-       1     1     .     1     .     .     4
-       .     _     _
-
-#+END_SRC
+    - metric-name
+    - value transform
 
     @@html:<kbd>@@C-u@@html:</kbd>@@ @@html:<kbd>@@M-x@@html:</kbd>@@
     ~metrics-tracker-cal~
 
-    if invoked with the universal argument (as above), metrics-tracker
-    takes a few extra options.  ~metrics-tracker-cal~ will accept
-    multiple metrics, but only one value will be shown on the
-    calendar.  multiple metrics can be combined using a math
-    expression (described below).  if there are multiple metrics that
-    aren't combined with an expression, or multiple expressions, only
-    the first value will be used.  ~metrics-tracker-cal~ will also
-    accept ~start-date~ and ~end-date~.  for details on these
-    parameters, see ~metrics-tracker-table~.
+    with an argument, emacs will prompt for the following additional
+    parameters:
+    - start-date
+    - end-date
+
+** derived metrics
+
+   it is possible to derive metrics by combining existing metrics
+   using mathematical expressions by editing
+   `metrics-tracker-derived-metrics' in [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Easy-Customization.html][customize]].  the expression
+   uses ~$N~ to refer to the Nth metric the derived metric is based
+   on.  for example, if you have metrics for "run dist" and "run time"
+   you could define a derived metric called "run mph" which is based
+   on those metrics and defined as ~$1/$2~.
+
+   the expression is optional.  if no expression is given, all base
+   metrics are summed together (as if the expression was ~$1 + $2 +
+   ... + $N~).  for example, if you have one metric for "running" and
+   another for "cycling" then you can create a derived metric called
+   "cardio" that depends on them and omit the expression.  cardio will
+   be the total of running and cycling.  when you sum metrics like
+   this, the ~total~ may become meaningless if you recorded them in
+   different units, but the ~percent~ and ~count~ will still be
+   useful.
+
+   derived metrics can be based on other derived metrics, but cycles
+   are obviously not allowed.  since it is easy to combine metrics in
+   this way, you can record metrics as granularly as you want, and put
+   them together when you view them.  the following image is a
+   dependency graph (not generated by metrics-tracker) showing my
+   derived metrics and their dependencies to get an idea of how
+   metrics can be combined.
+
+   [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/depgraph_v2.png]]
+
+   derived metrics can be used in all reports as if they were base
+   metrics.
+
+*** goodness metric
+
+   because derived metrics can accept arbitrary math expressions, it
+   is possible to create a derived metric that combines all of your
+   metrics, scaling to normalize them and negating metrics that are
+   "bad."  the result would be your "goodness," according to your own
+   definition of what is it to be good.  you could then compare your
+   goodness from week to week or year to year.
 
 ** named reports
 
-   to make it easier to pull up a report that is used repeatedly, you
-   can save it as a named report.  this can be done by invoking
+   to make it easier to pull up a report that you use repeatedly, you
+   can save it as a named report.  do this by generating the report
+   and then invoking
 
    @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-save-named-report~
 
    or by modifying the variable ~metrics-tracker-named-reports~ in
    [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Easy-Customization.html][customize]].  the fields in named reports are the same as the input
-   parameters requested during report generation, except that named
-   reports also support setting start and end date ranges.  date
-   ranges are optional, and either end of the range can be used
-   without the other.  if given they must be specified as
-   ~YYYY-MM-DD~.
-
-   this is what it looks like in the emacs customize ui.
-
-   [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/named_reports.png]]
+   parameters requested during report generation.
 
    you can display a named report by running
 
    @@html:<kbd>@@M-x@@html:</kbd>@@ ~metrics-tracker-show-named-report~
 
-   and choosing which report to show.  the report will be rendered
-   using current data (not the data at the time the report was
-   saved).
-
-** expressions
-
-   metrics-tracker allows you to compute values derived from metric
-   data using arbitrary mathematical expressions.  expressions operate
-   on all of the metrics at the same time point (think of a row in a
-   table report), effectively replacing the row of metric data with a
-   row of computed values.  each expression provided results in a
-   column for a table report, or a series in a graph report.
-
-   the expression parameter takes a comma delimited list of
-   expressions.  expressions can optionally have a label followed by
-   an equal sign.  expressions are evaluated by emacs' calc, so you
-   can use any operators or functions that calc accepts.  expressions
-   can refer to metric data using ~$N~ for the Nth metric chosen.
-
-   requesting a table from these two metrics (~run dist~ and ~run time~)
-   and this expression
-
-#+BEGIN_SRC
-  "dist (mi)=$1, time (h)=$2, mph=$1/$2"
-#+END_SRC
-
-   will result in:
-
-#+BEGIN_SRC
-  month ▼      dist (mi)    time (h)    mph
-  2019-12      20.4         5.07        4.03
-  2020-01      17.6         4.3         4.09
-  2020-02      15.8         4           3.95
-  2020-03      28.5         7.05        4.04
-  2020-04      47.5         10.75       4.42
-#+END_SRC
-
-  there doesn't have to be an expression for each metric, and each
-  expression doesn't have to depend on a metric.  the following
-  expressions compute one value from two metrics and adds a constant
-  goal line to the graph:
-
-#+BEGIN_SRC
-  "mph=$1/$2, goal=4.5"
-#+END_SRC
-
-  will produce:
-
-  [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/run_mph_vs_goal_1.png]]
+   and choosing which report to show from the list.  the report will
+   be rendered using current data (not the data at the time the report
+   was saved).
 
 * customization
 
   metrics-tracker defines several variables that can be used to
   customize behavior.  all of these have been mentioned above.
 
-   - metrics-tracker-named-reports :: a list of saved reports that can be shown by name
-   - metrics-tracker-dark-mode :: if ~t~, enable dark mode for image graphs
-   - metrics-tracker-graph-colors :: two lists of colors to use for graph series in light mode and dark mode
-   - metrics-tracker-metric-name-whitelist :: if set, read only these metrics when parsing the diary file
-   - metrics-tracker-metric-name-blacklist :: if set, ignore these metrics when parsing the diary file
+  - metrics-tracker-named-reports :: a list of saved reports that can be shown by name
+  - metrics-tracker-derived-metrics :: a list of derived metrics as described above
+  - metrics-tracker-dark-mode :: if ~t~, enable dark mode for image graphs
+  - metrics-tracker-graph-colors :: two lists of colors to use for graph series in light mode and dark mode
+  - metrics-tracker-metric-name-whitelist :: if set, read only these metrics when parsing the diary file
+  - metrics-tracker-metric-name-blacklist :: if set, ignore these metrics when parsing the diary file
+
+* details
+** gap handling
+
+   gaps in data are handled differently based on the situation.
+
+   in table reports gaps are filled with zeros, unless date grouping
+   is set to ~day~ in which case gaps are ignored.
+
+   in line or scatter graph reports gaps are ignored.  in bar or
+   stacked graph reports gaps are filed with zeros.
+
+   in calendar reports, gaps are marked with dots.
+
+** date grouping clipping
+
+   if the value transform is set to ~percent~ or one of the
+   ~per-...~ options, the metric value is scaled by the number of days
+   in the date grouping.  for example, if date grouping is year and
+   value transform is ~per-month~, the metric value for each year is
+   divided by 12.
+
+   if the current year is incomplete (say it's january) this will
+   appear to undercount it, since we'd divide by 12 but we only have
+   one month of metrics.  if the purpose of the graph is to compare
+   performance, then this isn't helpful.
+
+   in order to overcome this we divide by the portion of the year
+   that's complete, instead of the whole year.  this means that the
+   current year's value will represent what you're on pace to get to
+   by the end of the year, and is comparable to the other values in
+   the graph.
+
+   the same applies to the first date grouping.  it is clipped to start on
+   the date of the first metric entry.
+
+   one unfortunate outcome of this is that if we clip a date grouping
+   to a very short period, our extrapolations may result in numbers
+   that are out of our normal range.  for example, if you run two
+   times a week your percent of runs per week is 28%, but if you
+   happen to check your graph on monday, and you happened to have run
+   on sunday and monday, it'll say you've run 100% this week.
+
+** min value transform
+
+   metrics-tracker ignores gap-filling zeros when computing minimum
+   value.
+
+* gallery
+
+  these are descriptions of the screenshots in the gif slideshow in
+  the overview section.
+
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/0_list_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/0_list_20pct_v2.png]] ::  this
+       is a metric list report.  it lists all metrics found in the
+       diary (base metrics as well as derived metrics) along with some
+       useful stats about each.
+
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/1_config_derived_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/1_config_derived_20pct_v2.png]] :: this
+       is what the customize panel looks like when editing derived
+       metrics.  the example shows a derived metric that sums four
+       base metrics, and two derived metrics that combine two base
+       metrics as a rate.
+
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/2_config_named_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/2_config_named_20pct_v2.png]] :: this
+       is the customize panel for editing named reports.  the example
+       shows a line graph report, a cal report, and a table report.
+
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/3_bar_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/3_bar_20pct_v2.png]] :: this
+       is a bar graph of the percent of days by year on which I did
+       any drinking, non-work coding, or working out.  all three
+       metrics are derived from multiple base metrics.  there are
+       significant shifts over time.
+
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/4_line_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/4_line_20pct_v2.png]] :: this
+       is a line graph showing total drinks by month.  "drinks" is the
+       sum of beers, shots, and wine.  there is an obvious trend here.
+
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/5_ascii_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/5_ascii_20pct_v2.png]] :: this
+       is an ascii line graph of cycling miles per week by
+       year. "cycling" is the sum of bike commutes and joyrides.
+
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/6_stacked_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/6_stacked_20pct_v2.png]] :: this
+       is a stacked graph showing the percent of days where I cycled
+       or ran on an elliptical.  "cycling" is the sum of bike commutes
+       and joyrides.  I've been getting on the elliptical more
+       recently as I've not been able to bike commute as often.
+
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/7_scatter_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/7_scatter_20pct_v2.png]] :: this
+       is a scatter graph showing the total miles bike commuting or
+       running on an elliptical by week.  in this data I can see
+       pattern shifts which correlate to life changes (moves, new
+       jobs, had kids).
+
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/8_table_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/8_table_20pct_v2.png]] :: this
+       is a table of average miles and average speed per week.  speed
+       is not entered into the diary, but is computed from distance
+       and time.
+
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/9_cal_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/9_cal_20pct_v2.png]] :: this
+       is a calendar of hours coding for the first month of this
+       project.
 
 * todo
   - reports

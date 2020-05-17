@@ -1,0 +1,213 @@
+* derived metrics dependency graph
+** dependencies table
+
+   list of metric dependencies, taken from customize.
+
+#+NAME: dep
+| derived metric       | depends on            |
+|----------------------+-----------------------|
+| elisp coding         | emacs-tracker         |
+| elisp coding         | emacs-uml             |
+| elisp coding         | emacs-cloudsync       |
+| elisp coding         | emacs-scrum           |
+| karen elliptical mph | karen elliptical dist |
+| karen elliptical mph | karen elliptical time |
+| ian elliptical mph   | ian elliptical dist   |
+| ian elliptical mph   | ian elliptical time   |
+| coding               | elisp coding          |
+| coding               | tracker               |
+| coding               | gulch                 |
+| coding               | droid-tracker         |
+| coding               | quoted                |
+| coding               | club email            |
+| coding               | graphbug              |
+| coding               | justtapped            |
+| coding               | settleup              |
+| coding               | hiddenmessage         |
+| cycling              | commute               |
+| cycling              | joyride               |
+| cardio work          | ian elliptical dist   |
+| cardio work          | cycling               |
+| weights              | curls                 |
+| weights              | tris                  |
+| weights              | shoulders             |
+| weights              | fly                   |
+| weights              | bench                 |
+| abs                  | situps                |
+| abs                  | crunches              |
+| abs                  | plank                 |
+| abs                  | ab circuit            |
+| calisthenics         | dips                  |
+| calisthenics         | spullups              |
+| calisthenics         | pullups               |
+| calisthenics         | chinups               |
+| calisthenics         | pushups               |
+| workout              | weights               |
+| workout              | abs                   |
+| workout              | calisthenics          |
+| drinks               | beer                  |
+| drinks               | wine                  |
+| drinks               | shots                 |
+
+** format dependencies
+
+   format the table of dependencies into dot syntax.
+
+#+NAME: format-dot
+#+BEGIN_SRC elisp :colnames nil :results output :var dependencies=dep
+(mapcar (lambda (dep) (princ (apply #'format "\"%s\" -> \"%s\";\n" dep))) dependencies)
+#+END_SRC
+
+** generate diagram
+
+   embed the dot block into a dot file and generate a diagram.
+
+#+BEGIN_SRC dot :file "img/depgraph.png" :var input=format-dot :cmd "dot -Tpng -oimg/depgraph.png"
+digraph {
+  node [fontname = "arial"];
+  size="5,11"
+  layout=dot
+  rankdir=LR
+  $input
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:img/depgraph.png]]
+* update example images
+** list of examples
+#+NAME: examples
+| no | name                                                | reason                        | definition                                                                                           |
+|----+-----------------------------------------------------+-------------------------------+------------------------------------------------------------------------------------------------------|
+|  0 | list of metrics                                     | list                          | (metrics-tracker-list)                                                                               |
+|  1 | derived metrics config                              | config derived                | (customize-group "metrics-tracker")                                                                  |
+|  2 | named reports config                                | config named                  | (customize-group "metrics-tracker")                                                                  |
+|  3 | bar graph of percent of days by year                | bar graph, all are derived    | (metrics-tracker-graph-render '(("drinks" "workout" "coding") year percent nil nil bar svg))         |
+|  4 | line graph of drinks per month                      | line graph                    | (metrics-tracker-graph-render '(("drinks") month total nil nil line svg))                            |
+|  5 | ascii graph of miles per week by year               | ascii graph, per week by year | (metrics-tracker-graph-render '(("cycling") year per-week nil nil line ascii))                       |
+|  6 | scatter of commute, run dist by week                | scatter graph                 | (metrics-tracker-graph-render '(("ian elliptical dist" "commute") week total nil nil scatter svg))   |
+|  8 | stacked graph of percent of days cycling vs running | stacked graph                 | (metrics-tracker-graph-render '(("cycling" "ian elliptical dist") year percent nil nil stacked svg)) |
+|  7 | cal of emacs-tracker first month                    | cal, range                    | (metrics-tracker-cal-render '("emacs-tracker" total nil "2019-12-31"))                               |
+|  9 | table of avg distance vs avg speed                  | table, mph is derived         | (metrics-tracker-table-render '(("karen elliptical dist" "karen elliptical mph") week avg nil nil))  |
+** grab screenshots
+
+   first, remind me to change i3wm to floating mode so the emacs frame
+   can resize.  then resize the frame.
+
+   next loop through examples. for each example, render the graph
+   defined in the table and show the example name in the status line.
+   wait for input before advancing so I have time to get a screenshot.
+
+#+NAME: take-screenshots
+#+BEGIN_SRC elisp :var examples=examples :colnames nil
+  (read-string "Hit $mod+shift+space to enter floating mode, enter to continue ")
+  (set-frame-size (selected-frame) 100 30)
+  (dolist (example examples)
+    (eval (car (read-from-string (nth 3 example))))
+    (read-string (concat (nth 1 example) " ")))
+#+END_SRC
+
+#+RESULTS: take-screenshots
+
+** make thumbnails
+
+   make thumbnails for the gallery.
+
+#+NAME: thumbnail
+#+BEGIN_SRC sh :exports both :results output list raw
+  for file in $(find . -regex '.*/[0-9]+_[a-z_]+.png'); do
+    fname=${file%.*}_20pct.png
+    convert $file -resize 20% $fname;
+    echo $fname;
+    fname=${file%.*}_60pct.png
+    convert $file -resize 60% $fname;
+    echo $fname;
+  done
+#+END_SRC
+
+#+RESULTS: thumbnail
+- ./img/7_scatter_20pct.png
+- ./img/7_scatter_60pct.png
+- ./img/6_stacked_20pct.png
+- ./img/6_stacked_60pct.png
+- ./img/3_bar_20pct.png
+- ./img/3_bar_60pct.png
+- ./img/4_line_20pct.png
+- ./img/4_line_60pct.png
+- ./img/9_cal_20pct.png
+- ./img/9_cal_60pct.png
+- ./img/2_config_named_20pct.png
+- ./img/2_config_named_60pct.png
+- ./img/0_list_20pct.png
+- ./img/0_list_60pct.png
+- ./img/5_ascii_20pct.png
+- ./img/5_ascii_60pct.png
+- ./img/8_table_20pct.png
+- ./img/8_table_60pct.png
+- ./img/1_config_derived_20pct.png
+- ./img/1_config_derived_60pct.png
+
+** create animation
+
+#+NAME: animate
+#+BEGIN_SRC sh :exports both :results output list raw
+   convert -delay 300 -resize 60% $(find . -regex '.*/[0-9]+_[a-z_]+.png' | sort) img/animation.gif
+   echo ./img/animation.gif
+#+END_SRC
+
+#+RESULTS: animate
+- ./img/animation.gif
+
+* upload images to s3
+
+  upload images to my s3 bucket from which the github readme
+  references them.
+
+#+BEGIN_SRC sh :exports both :results output list raw :var thumbs=thumbnail anim=animate ver=2
+  upload() {
+    local=$1
+    remote=$(echo "$local" | sed "s/\.\/img\/\(.*\)\.\(.*\)$/\1_v$ver.\2/")
+    aws s3 cp $local s3://ianxm-githubfiles/emacs-tracker/$remote --quiet --acl public-read;
+    if [ 0 -ne $? ]
+    then
+      exit 1
+    fi
+    echo $remote
+  }
+
+  # for file in $thumbs; do
+  #   upload $file
+  # done
+  # upload $anim
+  upload "./img/depgraph.png"
+#+END_SRC
+
+#+RESULTS:
+- depgraph_v2.png
+
+#+BEGIN_SRC sh :results list raw
+  aws s3 ls ianxm-githubfiles/emacs-tracker/
+#+END_SRC
+
+#+RESULTS:
+- 2020-05-17 05:55:26      13430 0_list_20pct_v2.png
+- 2020-05-17 05:55:27      11031 1_config_derived_20pct_v2.png
+- 2020-05-17 05:55:25      12135 2_config_named_20pct_v2.png
+- 2020-05-17 05:55:23       8122 3_bar_20pct_v2.png
+- 2020-05-17 05:55:24       7781 4_line_20pct_v2.png
+- 2020-05-17 05:55:26       8262 5_ascii_20pct_v2.png
+- 2020-05-17 05:55:23       8478 6_stacked_20pct_v2.png
+- 2020-05-17 05:55:22      13126 7_scatter_20pct_v2.png
+- 2020-05-17 05:55:27       8863 8_table_20pct_v2.png
+- 2020-05-17 05:55:25       5639 9_cal_20pct_v2.png
+- 2020-05-15 08:45:22     254347 animation.gif
+- 2020-05-03 10:22:50     254347 animation_1.gif
+- 2020-05-17 05:55:28     439382 animation_v2.gif
+- 2020-04-19 13:45:22      32341 commute_by_week.png
+- 2020-04-29 06:33:32      27119 commute_by_week_1.png
+- 2020-04-19 13:46:29      16132 commute_run_by_year.png
+- 2020-04-29 06:33:45      12645 commute_run_by_year_1.png
+- 2020-04-24 15:35:26      19912 metrics_tracker_named_reports.png
+- 2020-04-29 06:49:36      32134 metrics_tracker_named_reports_1.png
+- 2020-04-29 06:34:05      32134 named_reports.png
+- 2020-05-02 14:07:24      23312 run_mph_vs_goal_1.png
