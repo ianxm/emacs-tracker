@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.3.2
+;; Version: 0.3.3
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -1265,7 +1265,7 @@ For example:
         (if (eq graph-output 'ascii)
             (while (re-search-forward "\f" nil t) ; delete the formfeed in gnuplot output
               (replace-match ""))
-          (insert-image (create-image fname) "graph") ; insert the tempfile into the output buffer
+          (insert-image (create-image fname) (format "graph image tempfile: %s" fname)) ; insert the tempfile into the output buffer
           (insert "\n")
           (goto-char (point-min))))
 
