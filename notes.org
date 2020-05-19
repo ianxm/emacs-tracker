@@ -24,12 +24,9 @@
 | weights        | curls           |
 | weights        | tris            |
 | weights        | shoulders       |
-| weights        | fly             |
-| weights        | bench           |
 | abs            | situps          |
 | abs            | crunches        |
 | abs            | planks          |
-| calisthenics   | dips            |
 | calisthenics   | pullups         |
 | calisthenics   | chinups         |
 | calisthenics   | pushups         |
@@ -53,7 +50,8 @@
 
    embed the dot block into a dot file and generate a diagram.
 
-#+BEGIN_SRC dot :file "img/depgraph.png" :var input=format-dot :cmd "dot -Tpng -oimg/depgraph.png"
+#+NAME: gen-diagram
+#+BEGIN_SRC dot :file "img/depgraph.png" :var input=format-dot
 digraph {
   node [fontname = "arial"];
   size="5,11"
@@ -114,6 +112,9 @@ digraph {
     convert $file -resize 60% $fname;
     echo $fname;
   done
+
+  convert img/depgraph.png -resize 60% ./img/depgraph_60pct.png
+  echo ./img/depgraph_60pct.png
 #+END_SRC
 
 #+RESULTS: thumbnail
@@ -139,6 +140,7 @@ digraph {
 - ./img/8_table_60pct.png
 - ./img/1_config_derived_20pct.png
 - ./img/1_config_derived_60pct.png
+- ./img/depgraph_60pct.png
 
 ** create animation
 
@@ -172,11 +174,11 @@ digraph {
     upload $file
   done
   upload $anim
-  upload "./img/depgraph.png"
+  upload "./img/depgraph_60pct.png"
 #+END_SRC
 
 #+RESULTS:
-- depgraph_v2.png
+- depgraph_60pct_v2.png
 
 #+BEGIN_SRC sh :results list raw
   aws s3 ls ianxm-githubfiles/emacs-tracker/

@@ -345,7 +345,7 @@ Jan 4, 2020 run dist 2
    derived metrics and their dependencies to get an idea of how
    metrics can be combined.
 
-   [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/depgraph_v2.png]]
+   [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/depgraph_60pct_v2.png]]
 
    derived metrics can be used in all reports as if they were base
    metrics.
