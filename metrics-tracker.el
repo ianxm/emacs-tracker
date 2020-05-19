@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.3.1
+;; Version: 0.3.2
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -451,7 +451,7 @@ of the derived metrics that depend on them."
                                                                      cycle-metrics)
                   result))
         (setq result (append (list metric-name) result))))
-    (reverse result)))
+    (nreverse result)))
 
 (defun metrics-tracker--date-to-bin (date date-grouping)
   "Return the start date of the bin containing DATE of size DATE-GROUPING.
@@ -836,7 +836,7 @@ If MULTP [boolean] is false, only ask for one metric, else loop until
             last-metric-name (completing-read "Metric: " (metrics-tracker--presorted-options all-metric-names) nil t))
       (if (not (string= last-metric-name "no more"))
           (setq metric-names (cons last-metric-name metric-names))))
-    (reverse metric-names)))
+    (nreverse metric-names)))
 
 (defun metrics-tracker--ask-for-date (prompt)
   "Display the PROMPT, return the response or nil if no response given.
@@ -944,7 +944,7 @@ For example:
                                              (max 10 (+ 3 (length (nth ii labels))))
                                              (metrics-tracker--num-sort (1+ ii)))
                                        headers)))
-                       (reverse headers))))
+                       (nreverse headers))))
 
       ;; configure
       (setq tabulated-list-padding 2)
@@ -1015,7 +1015,7 @@ GRAPH-TYPE [symbol] is the selected graph type, if the current operation is a gr
           (setq data (cons (list date-str
                                  (vconcat (list date-str) formatted-values))
                            data)))))
-    (reverse data))) ; return data
+    (nreverse data))) ; return data
 
 
 (defun metrics-tracker--format-value (value filler)
