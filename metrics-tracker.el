@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.3.5
+;; Version: 0.3.6
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -1326,12 +1326,10 @@ FNAME [string] filename of the temp file to write."
                (eq graph-type 'scatter))
            (insert "set xdata time\n")
            (insert (format "set xrange [\"%s\":\"%s\"]\n" (caar data) (caar (last data))))
-           (insert "set xtics rotate\n")
            (insert (format "set grid back ls 0 lc \"%s\"\n" fg-color))
            (insert "set pointsize 0.5\n"))
           ((or (eq graph-type 'bar)
                (eq graph-type 'stacked))
-           (insert "set xtics rotate\n")
            (insert (format "set boxwidth %f relative\n" (if (eq graph-type 'bar) 1.0 0.6)))
            (insert "set style data histogram\n")
            (insert (format "set style histogram %s\n"
@@ -1340,6 +1338,7 @@ FNAME [string] filename of the temp file to write."
            (insert (format "set grid ytics back ls 0 lc \"%s\"\n" fg-color))
            (if (eq graph-type 'stacked)
                (insert "set key invert\n"))))
+    (insert "set xtics rotate by 45 right\n")
     (insert (metrics-tracker--define-plot graph-type graph-output labels) "\n")
     (dotimes (_ii (length labels))
       (if (not date-format) ; is 'full
