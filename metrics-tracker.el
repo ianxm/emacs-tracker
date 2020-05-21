@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.3.3
+;; Version: 0.3.4
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -352,18 +352,22 @@ days since the last occurrence of any base metric."
 
       ;; mix in the derived metrics
       (let (derived-metric-name ; metric name as a symbol
-            derived-from) ; list of metrics from which the current metric is derived
+            derived-from        ; list of metrics from which the current metric is derived
+            count)              ; count of entries
         (dolist (metric metrics-tracker-derived-metrics)
           (setq derived-metric-name (intern (car metric) metrics-tracker-metric-names)
                 derived-from (mapcar (lambda (ii) (gethash (intern ii metrics-tracker-metric-names) metrics))
                                      (nth 1 metric)))
-          (puthash derived-metric-name
-                   (list derived-metric-name
-                         (seq-reduce (lambda (count ii) (+ count (or (nth 1 ii) 0))) derived-from 0)
-                         (seq-reduce (lambda (first ii) (if (time-less-p first (nth 2 ii)) first (nth 2 ii))) derived-from today)
-                         (seq-reduce (lambda (last ii) (if (time-less-p last (nth 2 ii)) (nth 3 ii) last)) derived-from 0)
-                         (seq-reduce (lambda (daysago ii) (min daysago (or (nth 4 ii) most-positive-fixnum))) derived-from most-positive-fixnum))
-                   metrics)))
+          (setq count (seq-reduce (lambda (count ii) (+ count (or (nth 1 ii) 0))) derived-from 0))
+          (if (eq 0 count) ; filter out derived metrics
+              (message (format "Ignoring derived metric with no entries: %s" derived-metric-name))
+            (puthash derived-metric-name
+                     (list derived-metric-name
+                           count
+                           (seq-reduce (lambda (first ii) (if (time-less-p first (nth 2 ii)) first (nth 2 ii))) derived-from today)
+                           (seq-reduce (lambda (last ii) (if (time-less-p last (nth 2 ii)) (nth 3 ii) last)) derived-from 0)
+                           (seq-reduce (lambda (daysago ii) (min daysago (or (nth 4 ii) most-positive-fixnum))) derived-from most-positive-fixnum))
+                     metrics))))
 
       ;; convert hash to list and sort by last update date
       (setq metrics-tracker-metric-index (sort (hash-table-values metrics) (lambda (a b) (> (nth 4 b) (nth 4 a)))))
