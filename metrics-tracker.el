@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.3.4
+;; Version: 0.3.5
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -1243,7 +1243,7 @@ For example:
 
     ;; prep output buffer
     (setq buffer (get-buffer-create metrics-tracker-output-buffer-name)
-          fname (and (not (eq graph-output 'ascii)) (make-temp-file "metrics-tracker")))
+          fname (and (not (eq graph-output 'ascii)) (make-temp-file "metrics-tracker" nil (format ".%s" graph-output))))
 
     (with-temp-buffer
       ;; load metric data into bins; hash of `bin-data' for each metric
