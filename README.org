@@ -25,7 +25,7 @@
   each of these screenshots is described in the gallery section later
   in this document.
 
-  [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/animation_v2.gif]]
+  [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/animation_v3.gif]]
 
   this is a port of [[https://github.com/ianxm/tracker][tracker]].
 
@@ -345,7 +345,7 @@ Jan 4, 2020 run dist 2
    derived metrics and their dependencies to get an idea of how
    metrics can be combined.
 
-   [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/depgraph_60pct_v2.png]]
+   [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/depgraph_60pct_v3.png]]
 
    derived metrics can be used in all reports as if they were base
    metrics.
@@ -443,53 +443,53 @@ Jan 4, 2020 run dist 2
   these are descriptions of the screenshots in the gif slideshow in
   the overview section.
 
-  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/0_index_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/0_index_20pct_v2.png]] ::  this
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/0_index_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/0_index_20pct_v3.png]] ::  this
        is a metric index report.  it lists all metrics found in the
        diary (base metrics as well as derived metrics) along with some
        useful stats about each.
 
-  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/1_config_derived_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/1_config_derived_20pct_v2.png]] :: this
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/1_config_derived_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/1_config_derived_20pct_v3.png]] :: this
        is what the customize panel looks like when editing derived
        metrics.  the example shows a derived metric that sums four
        base metrics, and two derived metrics that combine two base
        metrics as a rate.
 
-  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/2_config_named_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/2_config_named_20pct_v2.png]] :: this
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/2_config_named_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/2_config_named_20pct_v3.png]] :: this
        is the customize panel for editing named reports.  the example
        shows a line graph report, a cal report, and a table report.
 
-  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/3_bar_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/3_bar_20pct_v2.png]] :: this
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/3_bar_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/3_bar_20pct_v3.png]] :: this
        is a bar graph of the percent of days by year on which I did
        any drinking, non-work coding, or working out.  all three
        metrics are derived from multiple base metrics.  there are
        significant shifts over time.
 
-  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/4_line_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/4_line_20pct_v2.png]] :: this
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/4_line_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/4_line_20pct_v3.png]] :: this
        is a line graph showing total drinks by month.  "drinks" is the
        sum of beers, shots, and wine.  there is an obvious trend here.
 
-  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/5_ascii_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/5_ascii_20pct_v2.png]] :: this
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/5_ascii_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/5_ascii_20pct_v3.png]] :: this
        is an ascii line graph of cycling miles per week by
        year. "cycling" is the sum of bike commutes and joyrides.
 
-  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/6_stacked_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/6_stacked_20pct_v2.png]] :: this
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/6_stacked_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/6_stacked_20pct_v3.png]] :: this
        is a stacked graph showing the percent of days where I cycled
        or ran on an elliptical.  "cycling" is the sum of bike commutes
        and joyrides.  I've been getting on the elliptical more
        recently as I've not been able to bike commute as often.
 
-  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/7_scatter_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/7_scatter_20pct_v2.png]] :: this
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/7_scatter_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/7_scatter_20pct_v3.png]] :: this
        is a scatter graph showing the total miles bike commuting or
        running on an elliptical by week.  in this data I can see
        pattern shifts which correlate to life changes (moves, new
        jobs, had kids).
 
-  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/8_table_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/8_table_20pct_v2.png]] :: this
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/8_table_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/8_table_20pct_v3.png]] :: this
        is a table of average miles and average speed per week.  speed
        is not entered into the diary, but is computed from distance
        and time.
 
-  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/9_cal_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/9_cal_20pct_v2.png]] :: this
+  - [[https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/9_cal_60pct_v2.png][https://ianxm-githubfiles.s3.amazonaws.com/emacs-tracker/9_cal_20pct_v3.png]] :: this
        is a calendar of hours coding for the first month of this
        project.
 
