@@ -158,7 +158,7 @@ digraph {
   upload images to my s3 bucket from which the github readme
   references them.
 
-#+BEGIN_SRC sh :exports both :results output list raw :var thumbs=thumbnail anim=animate ver=2
+#+BEGIN_SRC sh :exports both :results output list raw :var thumbs=thumbnail anim=animate ver=3
   upload() {
     local=$1
     remote=$(echo "$local" | sed "s/\.\/img\/\(.*\)\.\(.*\)$/\1_v$ver.\2/")
@@ -178,7 +178,31 @@ digraph {
 #+END_SRC
 
 #+RESULTS:
-- depgraph_60pct_v2.png
+- 7_scatter_20pct_v3.png
+- 7_scatter_60pct_v3.png
+- 6_stacked_20pct_v3.png
+- 6_stacked_60pct_v3.png
+- 3_bar_20pct_v3.png
+- 3_bar_60pct_v3.png
+- 4_line_20pct_v3.png
+- 4_line_60pct_v3.png
+- 0_index_20pct_v3.png
+- 0_index_60pct_v3.png
+- 9_cal_20pct_v3.png
+- 9_cal_60pct_v3.png
+- 2_config_named_20pct_v3.png
+- 2_config_named_60pct_v3.png
+- 0_list_20pct_v3.png
+- 0_list_60pct_v3.png
+- 5_ascii_20pct_v3.png
+- 5_ascii_60pct_v3.png
+- 8_table_20pct_v3.png
+- 8_table_60pct_v3.png
+- 1_config_derived_20pct_v3.png
+- 1_config_derived_60pct_v3.png
+- depgraph_60pct_v3.png
+- animation_v3.gif
+- depgraph_60pct_v3.png
 
 #+BEGIN_SRC sh :results list raw
   aws s3 ls ianxm-githubfiles/emacs-tracker/

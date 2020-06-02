@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.3.6
+;; Version: 0.3.7
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -1092,7 +1092,7 @@ For example:
     (setq metrics-tracker-last-report-config (cons 'cal cal-config))
 
     (metrics-tracker--setup-output-buffer)
-    (fundamental-mode)
+    (special-mode)
 
     ;; render the calendars
     (let* ((inhibit-read-only t)
@@ -1256,7 +1256,7 @@ For example:
 
       (save-current-buffer
         (metrics-tracker--setup-output-buffer)
-        (fundamental-mode))
+        (special-mode))
 
       (unless (null fname)
         (setq metrics-tracker-tempfiles (cons fname metrics-tracker-tempfiles)) ; keep track of it so we can delete it

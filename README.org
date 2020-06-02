@@ -64,36 +64,32 @@
 
     where,
     - date :: the date of a particular day.  although the emacs diary
-              allows dates like "wednesday," which apply to all
-              wednesdays, metrics-tracker only uses dates for specific
-              days.  date strings can be in any format
-              ~parse-time-string~ can use.  some examples of valid
-              dates are:
+      allows dates like "wednesday," which apply to all wednesdays,
+      metrics-tracker only uses dates for specific days.  emacs' date
+      handling is [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Date-Formats.html#Date-Formats][flexible]].  some examples of valid dates are:
       - ~2019-12-31~
       - ~31 Dec 2019~
       - ~December 31, 2019~
       - ~31/Dec/2019~
     - time :: the time of day is optional and ignored by
-              metrics-tracker if it is provided.  if provided, it must
-              be formatted as:
+      metrics-tracker if it is provided.  if provided, it must be
+      formatted as:
       - ~10:30~
       - ~10:30a~
       - ~10:30 a~
       - ~10:30:10 am~
     - metric-name :: is any string.  it can be as long as you like and
-                     can include spaces but keeping them short helps
-                     with readability.  valid values may look like:
+      can include spaces but keeping them short helps with
+      readability.  valid values may look like:
       - ~pushups~
       - ~watched tv~
     - value :: is a number (integer or decimal) or a duration
-               (hh:mm:ss.ss).  for number values, metrics-tracker
-               doesn't care about units.  ~value~ is just a number.
-               if you're tracking how much tv you watch, a "4" could
-               mean 4 shows or 4 hours; it's up to you.  do not
-               include commas.  for duration values, hours and
-               fractional seconds are optional.  metrics-tracker
-               converts durations to decimal hours.  valid values may
-               be:
+      (hh:mm:ss.ss).  for number values, metrics-tracker doesn't care
+      about units.  ~value~ is just a number.  if you're tracking how
+      much tv you watch, a "4" could mean 4 shows or 4 hours; it's up
+      to you.  do not include commas.  for duration values, hours and
+      fractional seconds are optional.  metrics-tracker converts
+      durations to decimal hours.  valid values may be:
       - ~40~
       - ~1.2~
       - ~10:21.21~
