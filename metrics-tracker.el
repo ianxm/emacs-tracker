@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.3.7
+;; Version: 0.3.8
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -466,11 +466,11 @@ DATE-GROUPING [symbol] defines bin size."
   (if (eq date-grouping 'full)
       'full
     (let ((date-fields (decode-time date))
-          (offset (cond
-                   ((eq date-grouping 'day) 0)
-                   ((eq date-grouping 'week) (nth 6 (decode-time date)))
-                   ((eq date-grouping 'month) (1- (nth 3 (decode-time date))))
-                   ((eq date-grouping 'year) (1- (string-to-number (format-time-string "%j" date)))))))
+          (offset (pcase date-grouping
+                   (`day 0)
+                   (`week (nth 6 (decode-time date)))
+                   (`month (1- (nth 3 (decode-time date))))
+                   (`year (1- (string-to-number (format-time-string "%j" date)))))))
       (encode-time 0 0 0
                    (- (nth 3 date-fields) offset)
                    (nth 4 date-fields)
@@ -491,11 +491,11 @@ Return [time] the start date of the next bin."
            (is-dst (nth 7 date-fields))
            (next-date-fields date-fields)
            next-date)
-      (cond
-       ((eq date-grouping 'day) (setcar (nthcdr 3 next-date-fields) (1+ (nth 3 next-date-fields))))
-       ((eq date-grouping 'week) (setcar (nthcdr 3 next-date-fields) (+ 7 (nth 3 next-date-fields))))
-       ((eq date-grouping 'month) (setcar (nthcdr 4 next-date-fields) (1+ (nth 4 next-date-fields))))
-       ((eq date-grouping 'year) (setcar (nthcdr 5 next-date-fields) (1+ (nth 5 next-date-fields)))))
+      (pcase date-grouping
+       (`day (setcar (nthcdr 3 next-date-fields) (1+ (nth 3 next-date-fields))))
+       (`week (setcar (nthcdr 3 next-date-fields) (+ 7 (nth 3 next-date-fields))))
+       (`month (setcar (nthcdr 4 next-date-fields) (1+ (nth 4 next-date-fields))))
+       (`year (setcar (nthcdr 5 next-date-fields) (1+ (nth 5 next-date-fields)))))
       (setq next-date (apply #'encode-time next-date-fields))
       (setq next-date-fields (decode-time next-date))
       ;; suppress daylight savings shifts
@@ -540,11 +540,11 @@ Return [number|cons] bin value after merging the new value."
 (defun metrics-tracker--date-bin-format (date-grouping)
   "Get the format string for the the bin based on the DATE-GROUPING.
 Return [string]."
-  (cond
-   ((eq date-grouping 'day) "%Y-%m-%d")
-   ((eq date-grouping 'week) "%Y-%m-%d")
-   ((eq date-grouping 'month) "%Y-%m")
-   ((eq date-grouping 'year) "%Y")))
+  (pcase date-grouping
+   (`day "%Y-%m-%d")
+   (`week "%Y-%m-%d")
+   (`month "%Y-%m")
+   (`year "%Y")))
 
 (defun metrics-tracker--clip-duration (bin-start span first-date last-date)
   "Clip the given duration if it falls outside of first and last dates.
@@ -598,13 +598,13 @@ value] are needed to determine the number of days in the current
 bin.
 
 Return [number|nil] transformed value of the bin."
-  (let ((bin-duration (cond
-                       ((eq date-grouping 'day) 1.0)
-                       ((eq date-grouping 'week) (metrics-tracker--clip-duration bin-date 7 first-date today))
-                       ((eq date-grouping 'month) (metrics-tracker--clip-duration bin-date (metrics-tracker--days-of-month bin-date) first-date today))
-                       ((eq date-grouping 'year) (metrics-tracker--clip-duration bin-date 365 first-date today))
-                       ((eq date-grouping 'full) (float (- (time-to-days today)
-                                                           (time-to-days first-date)))))))
+  (let ((bin-duration (pcase date-grouping
+                       (`day 1.0)
+                       (`week (metrics-tracker--clip-duration bin-date 7 first-date today))
+                       (`month (metrics-tracker--clip-duration bin-date (metrics-tracker--days-of-month bin-date) first-date today))
+                       (`year (metrics-tracker--clip-duration bin-date 365 first-date today))
+                       (`full (float (- (time-to-days today)
+                                        (time-to-days first-date)))))))
     (cond
      ((null value)
       value)
@@ -1294,9 +1294,10 @@ GRAPH-OUTPUT [symbol] graph output format (ascii, svg, png).
 
 FNAME [string] filename of the temp file to write."
   (let ((date-format (metrics-tracker--date-bin-format date-grouping))
-        (term (cond ((eq graph-output 'svg) "svg")
-                    ((eq graph-output 'png) "pngcairo font \"Arial,10\"")
-                    (t "dumb")))
+        (term (pcase graph-output
+                (`svg "svg")
+                (`png "pngcairo font \"Arial,10\"")
+                (_ "dumb")))
         (width (if (eq graph-output 'ascii) (1- (window-width)) (car metrics-tracker-graph-size)))
         (height (if (eq graph-output 'ascii) (1- (window-height)) (cdr metrics-tracker-graph-size)))
         (title (if (= 1 (length labels)) (car labels) ""))
@@ -1411,12 +1412,10 @@ This prompts for which report (saved in
                            metrics-tracker-named-reports))
          (report-type (cadr report))
          (report-config (cddr report)))
-    (cond ((eq report-type 'table)
-           (metrics-tracker-table-render report-config))
-          ((eq report-type 'cal)
-           (metrics-tracker-cal-render report-config))
-          ((eq report-type 'graph)
-           (metrics-tracker-graph-render report-config)))))
+    (pcase report-type
+      (`table (metrics-tracker-table-render report-config))
+      (`cal (metrics-tracker-cal-render report-config))
+      (`graph (metrics-tracker-graph-render report-config)))))
 
 (provide 'metrics-tracker)
 
