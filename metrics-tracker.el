@@ -248,10 +248,10 @@ Valid metrics entries look like \"DATE TIME METRICNAME VALUE\" where
 - METRICNAME is any string, whitespace included
 - VALUE is a decimal number like \"1\" or \"1.2\" or a duration value like \"10:01\" or \"1:20:32.21\""
 
-  (let ((valid-formats '("^\\([[:digit:]]\\{4\\}\-[[:digit:]]\\{2\\}\-[[:digit:]]\\{2\\}\\) *\\(?:[[:digit:]\:]+ ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$"     ; YYYY-MM-DD
-                         "^\\([[:digit:]]\\{2\\}\/[[:alpha:]]+\/[[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]+ ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$"           ; DD/MMM/YYYY
-                         "^\\([[:alpha:]]+ [[:digit:]]\\{1,2\\}, [[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]\\{1,8\\} ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$"  ; MMM DD, YYYY
-                         "^\\([[:digit:]]\\{1,2\\} [[:alpha:]]+ [[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]\\{1,8\\} ?[ap]?m?\\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$")) ; DD MMM YYYY
+  (let ((valid-formats '("^\\([[:digit:]]\\{4\\}\-[[:digit:]]\\{2\\}\-[[:digit:]]\\{2\\}\\) *\\(?:[[:digit:]\:]+ ?[ap]?m? \\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$"     ; YYYY-MM-DD
+                         "^\\([[:digit:]]\\{2\\}\/[[:alpha:]]+\/[[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]+ ?[ap]?m? \\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$"           ; DD/MMM/YYYY
+                         "^\\([[:alpha:]]+ [[:digit:]]\\{1,2\\}, [[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]\\{1,8\\} ?[ap]?m? \\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$"  ; MMM DD, YYYY
+                         "^\\([[:digit:]]\\{1,2\\} [[:alpha:]]+ [[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]\\{1,8\\} ?[ap]?m? \\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$")) ; DD MMM YYYY
         metric-name metric-date metric-value foundp)
     (with-temp-buffer
       (insert-file-contents diary-file)
