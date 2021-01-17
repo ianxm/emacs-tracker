@@ -170,6 +170,8 @@ Jan 4, 2020 run dist 2
      possible choices:
      - total :: sum all of the values in the date grouping
      - count :: count entries in the date grouping
+     - accum :: accumulate entries
+     - accum-count :: accumulate entry counts
      - min :: the minimum of all values in a date grouping
      - max :: the maximum of all values in a date grouping
      - avg :: the average of all values in a date grouping

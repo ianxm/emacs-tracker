@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.3.8
+;; Version: 0.3.9
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -96,7 +96,8 @@ Display a report from this list using `metrics-tracker-show-named-report'."
                                 (const :tag "difference total" diff-total) (const :tag "difference min" diff-min) (const :tag "difference max" diff-max)
                                 (const :tag "difference average" diff-avg) (const :tag "difference count" diff-count) (const :tag "difference percent" diff-percent)
                                 (const :tag "difference per day" diff-per-day) (const :tag "difference per week" diff-per-week)
-                                (const :tag "difference per month" diff-per-month) (const :tag "difference per year" diff-per-year))
+                                (const :tag "difference per month" diff-per-month) (const :tag "difference per year" diff-per-year)
+                                (const :tag "accumulate" accum) (const :tag "accumulate count" accum-count))
                         (choice :tag "Start Date     " (const :tag "first occurrence" nil) (string :tag "date string"))
                         (choice :tag "End Date       " (const :tag "last occurrence" nil) (string :tag "date string")))
                   (list :tag "Calendar Report"
@@ -116,7 +117,8 @@ Display a report from this list using `metrics-tracker-show-named-report'."
                                 (const :tag "difference total" diff-total) (const :tag "difference min" diff-min) (const :tag "difference max" diff-max)
                                 (const :tag "difference average" diff-avg) (const :tag "difference count" diff-count) (const :tag "difference percent" diff-percent)
                                 (const :tag "difference per day" diff-per-day) (const :tag "difference per week" diff-per-week)
-                                (const :tag "difference per month" diff-per-month) (const :tag "difference per year" diff-per-year))
+                                (const :tag "difference per month" diff-per-month) (const :tag "difference per year" diff-per-year)
+                                (const :tag "accumulate" accum) (const :tag "accumulate count" accum-count))
                         (choice :tag "Start Date     " (const :tag "first occurrence" nil) (string :tag "date string"))
                         (choice :tag "End Date       " (const :tag "last occurrence" nil) (string :tag "date string"))
                         (choice :tag "Graph Type     " (const line) (const bar) (const stacked) (const scatter))
@@ -166,7 +168,7 @@ the diary file to be re-read if the data is needed again.")
 (define-error 'metrics-tracker-invalid-value "The given value cannot be parsed")
 
 (defconst metrics-tracker-grouping-and-transform-options
-  '(day (total count)
+  '(day (total count accum accum-count)
         week (total min max avg count percent per-day
                     diff-total diff-min diff-max diff-avg diff-count diff-percent diff-per-day)
         month (total min max avg count percent per-day per-week
@@ -237,10 +239,12 @@ Returned a time value with hours, minutes, seconds zeroed out."
   "Sort a list of DATES."
   `(sort ,dates (lambda (a b) (time-less-p a b))))
 
-(defun metrics-tracker--process-diary (filter action)
+(defun metrics-tracker--process-diary (filter action &optional start-date end-date)
   "Parse the diary file.
 For each valid metrics entry found, parse the fields and then
 apply the given FILTER and ACTION.
+
+Optionally, filter out metrics before START-DATE or after END-DATE.
 
 Valid metrics entries look like \"DATE TIME METRICNAME VALUE\" where
 - DATE looks like \"2020-01-01\" or \"Jan 1, 2020\" or \"1 Jan 2020\"
@@ -266,7 +270,14 @@ Valid metrics entries look like \"DATE TIME METRICNAME VALUE\" where
                           metric-name (intern (match-string 2 line) metrics-tracker-metric-names)
                           metric-value (metrics-tracker--try-read-value (match-string 3 line))
                           foundp t)))
-              (if (and foundp (funcall filter metric-date metric-name))
+              (if (and foundp
+                       (funcall filter metric-date metric-name)
+                       (or (null start-date)
+                           (time-less-p start-date metric-date)
+                           (equal start-date metric-date))
+                       (or (null end-date)
+                           (time-less-p metric-date end-date)
+                           (equal metric-date end-date)))
                   (funcall action metric-date metric-name metric-value)))
           (metrics-tracker-invalid-value nil) ; the regexes aren't strict enough to filter this out, but it should be skipped
           (error (format "Error parsing line: %s" line)))))))
@@ -519,7 +530,7 @@ VALUE-TRANSFORM [symbol] defines an operation to apply to bin values.
 
 Return [number|cons] bin value after merging the new value."
   (cond
-   ((seq-contains '(count percent diff-count diff-percent) value-transform)
+   ((seq-contains '(count percent diff-count diff-percent accum-count) value-transform)
     (1+ (or existing-value 0)))
    ((or (eq value-transform 'min)
         (eq value-transform 'diff-min))
@@ -583,7 +594,7 @@ DATE [time] any date."
 
 (defun metrics-tracker--bin-to-val (value
                             value-transform date-grouping
-                            bin-date first-date today)
+                            bin-date first-date last-date)
   "Transform and format the bin VALUE into the value used in reporting.
 
 VALUE [number|cons|nil] is usually a number but can be a cons
@@ -593,23 +604,23 @@ for gaps.
 VALUE-TRANSFORM [symbol] and DATE-GROUPING [symbol] are used to
 transform the value.
 
-BIN-DATE [time], FIRST-DATE [time], TODAY [time
+BIN-DATE [time], FIRST-DATE [time], LAST-DATE [time
 value] are needed to determine the number of days in the current
 bin.
 
 Return [number|nil] transformed value of the bin."
   (let ((bin-duration (pcase date-grouping
                        (`day 1.0)
-                       (`week (metrics-tracker--clip-duration bin-date 7 first-date today))
-                       (`month (metrics-tracker--clip-duration bin-date (metrics-tracker--days-of-month bin-date) first-date today))
-                       (`year (metrics-tracker--clip-duration bin-date 365 first-date today))
-                       (`full (float (- (time-to-days today)
+                       (`week (metrics-tracker--clip-duration bin-date 7 first-date last-date))
+                       (`month (metrics-tracker--clip-duration bin-date (metrics-tracker--days-of-month bin-date) first-date last-date))
+                       (`year (metrics-tracker--clip-duration bin-date 365 first-date last-date))
+                       (`full (float (- (time-to-days last-date)
                                         (time-to-days first-date)))))))
     (cond
      ((null value)
       value)
 
-     ((seq-contains '(total min max count diff-total diff-min diff-max diff-count) value-transform)
+     ((seq-contains '(total min max count diff-total diff-min diff-max diff-count accum accum-count) value-transform)
       value)
 
      ((or (eq value-transform 'avg)
@@ -637,7 +648,7 @@ Return [number|nil] transformed value of the bin."
           (eq value-transform 'diff-per-year))
       (* value (/ 365 bin-duration))))))
 
-(defun metrics-tracker--bin-metric-data (metric-names-str date-grouping value-transform today &optional allow-gaps-p)
+(defun metrics-tracker--bin-metric-data (metric-names-str date-grouping value-transform start-date end-date &optional allow-gaps-p)
   "Read the requested metric data from the diary.
 
 METRIC-NAMES-STR [list string] keep entries for these metrics.
@@ -646,7 +657,9 @@ DATE-GROUPING [symbol] defines bin size.
 
 VALUE-TRANSFORM [symbol] defines operations to perform on bin values.
 
-TODAY [time] date to end gap filling.
+START-DATE [time] date on which report should start.
+
+END-DATE [time] date on which report should end, and when to end gap filling.
 
 ALLOW-GAPS-P [boolean] If t, don't fill gaps.
 
@@ -680,7 +693,7 @@ Return the bin data as [hash symbol->[hash time->number]]."
 
     ;; read the diary file, fill day bins for base metrics
     (setq effective-date-grouping 'day)
-    (metrics-tracker--process-diary bin-filter-fcn bin-action-fcn)
+    (metrics-tracker--process-diary bin-filter-fcn bin-action-fcn start-date end-date)
     (setq effective-date-grouping date-grouping) ; revert back to chosen `date-grouping'
 
     ;; compute derived metrics
@@ -695,35 +708,40 @@ Return the bin data as [hash symbol->[hash time->number]]."
 
     ;; fill gaps and apply value transforms for base metrics, compute values for derived metrics
     (dolist (metric-name metric-names)
-      (let* ((first-date (nth 2 (nth 0 (seq-filter          ; [time] first date of metric data as a time value
+      (let* ((first-date (nth 2 (nth 0 (seq-filter                ; [time] first date of metric data as a time value
                                         (lambda (item) (eq (car item) metric-name)) metrics-tracker-metric-index))))
-             (first-date-bin (metrics-tracker--date-to-bin  ; [time] date bin containing first date
+             (first-date-bin (metrics-tracker--date-to-bin        ; [time] date bin containing first date
                               first-date date-grouping))
-             (today-bin (metrics-tracker--date-to-bin today ; [time] date bin containing today
+             (end-date-bin (metrics-tracker--date-to-bin end-date ; [time] date bin containing the `end-date'
                                                       date-grouping))
-             (bin-data (gethash metric-name bin-data-all))) ; [hash time->number]
+             (bin-data (gethash metric-name bin-data-all)))       ; [hash time->number]
 
         (if (eq date-grouping 'full)
             (puthash 'full
-                     (metrics-tracker--bin-to-val (gethash 'full bin-data) value-transform date-grouping 'full first-date today)
+                     (metrics-tracker--bin-to-val (gethash 'full bin-data) value-transform date-grouping 'full first-date end-date)
                      bin-data)
           (let* ((current-date-bin first-date-bin)
                  (last-value (metrics-tracker--bin-to-val        ; the value from the last bin we visited
-                              (gethash current-date-bin bin-data) value-transform date-grouping current-date-bin first-date today))
+                              (gethash current-date-bin bin-data) value-transform date-grouping current-date-bin first-date end-date))
+                 (total-value 0)                                 ; the total so far if we're accumulating
                  current-value                                   ; the value from the bin we're currently visiting
                  write-value)                                    ; the value to write for the current bin
-            (while (or (time-less-p current-date-bin today-bin)
-                       (equal current-date-bin today-bin))
+            (while (or (time-less-p current-date-bin end-date-bin)
+                       (equal current-date-bin end-date-bin))
               (when (or (gethash current-date-bin bin-data)
                         (not allow-gaps-p))
                 (setq current-value (metrics-tracker--bin-to-val ; the value for the current bin
                                      (gethash current-date-bin bin-data 0)
-                                     value-transform date-grouping current-date-bin first-date today))
-                (if (seq-contains '(diff-total diff-min diff-max diff-avg diff-count diff-percent
-                                               diff-per-day diff-per-week diff-per-month diff-per-year)
-                                  value-transform)
-                    (setq write-value (- current-value last-value)) ; apply diff
-                  (setq write-value current-value))
+                                     value-transform date-grouping current-date-bin first-date end-date))
+                (cond ((seq-contains '(diff-total diff-min diff-max diff-avg diff-count diff-percent
+                                                  diff-per-day diff-per-week diff-per-month diff-per-year)
+                                     value-transform)
+                       (setq write-value (- current-value last-value))) ; apply diff
+                      ((seq-contains '(accum accum-count) value-transform)
+                       (setq total-value (+ total-value current-value)) ; compute and use total
+                       (setq write-value total-value))
+                      (t
+                       (setq write-value current-value)))
 
                 (puthash current-date-bin write-value bin-data))
               (setq last-value current-value                        ; save last value for diff
@@ -797,7 +815,7 @@ VALUE-TRANSFORM [symbol] defines an operation to perform on bin values."
                              dep-metrics))
          float-values value-str)
     ;; for count or percent just sum values, otherwise apply the expression
-    (if (or (seq-contains '(count percent diff-count diff-percent) value-transform)
+    (if (or (seq-contains '(count percent diff-count diff-percent accum-count) value-transform)
             (null expression))
         (apply '+ (seq-remove #'null dep-values))
       (setq float-values (mapcar ; convert values to math-floats for calc
@@ -923,7 +941,8 @@ For example:
     (setq metrics-tracker-last-report-config (cons 'table table-config))
 
     ;; load metric data into bins; hash containing `bin-data' for each metric in `metric-names' plus any needed base metrics
-    (setq bin-data-all (metrics-tracker--bin-metric-data metric-names-str date-grouping value-transform today))
+    (setq bin-data-all (metrics-tracker--bin-metric-data metric-names-str date-grouping value-transform
+                                                         start-date (if (time-less-p today end-date) today end-date)))
 
     (if (and (eq date-grouping 'full)
              (= 1 (length metric-names)))
@@ -1099,7 +1118,8 @@ For example:
            (label (nth 0 (metrics-tracker--choose-labels (list metric-name-str) value-transform)))
 
            ;; load metric data into bins; list of `bin-data' for each metric in the same order as `metric-names'
-           (bin-data-all (metrics-tracker--bin-metric-data (list metric-name-str) 'day value-transform today t))
+           (bin-data-all (metrics-tracker--bin-metric-data (list metric-name-str) 'day value-transform
+                                                           start-date (if (time-less-p today end-date) today end-date) t))
 
            ;; find the first date
            (dates (hash-table-keys (car (hash-table-values bin-data-all))))
@@ -1247,7 +1267,8 @@ For example:
 
     (with-temp-buffer
       ;; load metric data into bins; hash of `bin-data' for each metric
-      (let* ((bin-data-all (metrics-tracker--bin-metric-data metric-names-str date-grouping value-transform today))
+      (let* ((bin-data-all (metrics-tracker--bin-metric-data metric-names-str date-grouping value-transform
+                                                             start-date (if (time-less-p today end-date) today end-date)))
              ;; determine series labels
              (labels (metrics-tracker--choose-labels metric-names-str value-transform))
              ;; prepare the graph data from the bin data
