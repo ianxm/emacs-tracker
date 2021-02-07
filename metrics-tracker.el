@@ -239,6 +239,26 @@ Returned a time value with hours, minutes, seconds zeroed out."
   "Sort a list of DATES."
   `(sort ,dates (lambda (a b) (time-less-p a b))))
 
+(defconst metrics-tracker--entry-format
+  (rx line-start
+      (group (or
+              (seq (= 4 digit) ?- (= 2 digit) ?- (= 2 digit))                  ; YYYY-MM-DD
+              (seq (= 2 digit) ?/ (repeat 2 3 alpha) ?/ (= 4 digit))           ; YYYY/MMM/DD
+              (seq (>= 2 alpha) space (repeat 1 2 digit) ?, space (= 4 digit)) ; MMM DD, YYYY
+              (seq (repeat 1 2 digit) space (>= 2 alpha) space (= 4 digit))))  ; DD MMM YYYY
+      (opt (1+ space) (repeat 1 2 digit) ?: (= 2 digit)                        ; HH:MM
+           (opt (0+ space) (in ?A ?a ?P ?p) (in ?M ?m)))                       ; (am|pm)
+      (1+ space) (group (1+ ascii))                                            ; metric name
+      (1+ space) (group (1+ (in digit ?. ?: ?-)))                              ; (1.5|1:30)
+      (0+ space) line-end))
+
+(defconst metrics-tracker--time-format
+  (rx line-start
+      (opt (group (repeat 1 2 digit)) ?:)        ; hh:
+      (group (= 2 digit)) ?: (group (= 2 digit)) ; mm:ss
+      (opt ?. (1+ digit))                        ; .ms
+      line-end))
+
 (defun metrics-tracker--process-diary (filter action &optional start-date end-date)
   "Parse the diary file.
 For each valid metrics entry found, parse the fields and then
@@ -248,37 +268,28 @@ Optionally, filter out metrics before START-DATE or after END-DATE.
 
 Valid metrics entries look like \"DATE TIME METRICNAME VALUE\" where
 - DATE looks like \"2020-01-01\" or \"Jan 1, 2020\" or \"1 Jan 2020\"
-- TIME (which we ignore) looks like \"10:30\" or \"10:30a\" or \"10:30 am\"
+- TIME (optional, and we ignore it) looks like \"10:30\" or \"10:30a\" or \"10:30 am\"
 - METRICNAME is any string, whitespace included
 - VALUE is a decimal number like \"1\" or \"1.2\" or a duration value like \"10:01\" or \"1:20:32.21\""
 
-  (let ((valid-formats '("^\\([[:digit:]]\\{4\\}\-[[:digit:]]\\{2\\}\-[[:digit:]]\\{2\\}\\) *\\(?:[[:digit:]\:]+ ?[ap]?m? \\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$"     ; YYYY-MM-DD
-                         "^\\([[:digit:]]\\{2\\}\/[[:alpha:]]+\/[[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]+ ?[ap]?m? \\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$"           ; DD/MMM/YYYY
-                         "^\\([[:alpha:]]+ [[:digit:]]\\{1,2\\}, [[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]\\{1,8\\} ?[ap]?m? \\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$"  ; MMM DD, YYYY
-                         "^\\([[:digit:]]\\{1,2\\} [[:alpha:]]+ [[:digit:]]\\{4\\}\\) *\\(?:[[:digit:]\:]\\{1,8\\} ?[ap]?m? \\)? *\\([[:ascii:]]+\\) \\([[:digit:]\.:]+\\)$")) ; DD MMM YYYY
-        metric-name metric-date metric-value foundp)
+  (let (metric-name metric-date metric-value)
     (with-temp-buffer
       (insert-file-contents diary-file)
       (dolist (line (split-string (buffer-string) "\n" t))
         (condition-case nil
-            (progn
-              (setq foundp nil)
-              (dolist (format valid-formats)
-                (if (string-match format line)
-                    (setq metric-date (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
-                                                                   (seq-take (parse-time-string (match-string 1 line)) 6)))
-                          metric-name (intern (match-string 2 line) metrics-tracker-metric-names)
-                          metric-value (metrics-tracker--try-read-value (match-string 3 line))
-                          foundp t)))
-              (if (and foundp
-                       (funcall filter metric-date metric-name)
-                       (or (null start-date)
-                           (time-less-p start-date metric-date)
-                           (equal start-date metric-date))
-                       (or (null end-date)
-                           (time-less-p metric-date end-date)
-                           (equal metric-date end-date)))
-                  (funcall action metric-date metric-name metric-value)))
+            (when (string-match metrics-tracker--entry-format line)
+              (setq metric-date (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                                                             (seq-take (parse-time-string (match-string 1 line)) 6)))
+                    metric-name (intern (match-string 2 line) metrics-tracker-metric-names)
+                    metric-value (metrics-tracker--try-read-value (match-string 3 line)))
+              (when (and (funcall filter metric-date metric-name)
+                         (or (null start-date)
+                             (time-less-p start-date metric-date)
+                             (equal start-date metric-date))
+                         (or (null end-date)
+                             (time-less-p metric-date end-date)
+                             (equal metric-date end-date)))
+                (funcall action metric-date metric-name metric-value)))
           (metrics-tracker-invalid-value nil) ; the regexes aren't strict enough to filter this out, but it should be skipped
           (error (format "Error parsing line: %s" line)))))))
 
@@ -292,7 +303,7 @@ those cases we raise the `metric-tracker-invalid-value' signal.
 STRING-VALUE [string] is expected to contain a metric value.  It
 may be formatted as a number (10.21) or a duration (10:21). Hours
 are optional for duration values."
-  (cond ((string-match "^\\(?:\\([[:digit:]]\\{1,2\\}\\):\\)?\\([[:digit:]]\\{2\\}\\):\\([[:digit:]]\\{2\\}\\(?:\\.[[:digit:]]*\\)?\\)$" string-value) ; duration as hh:mm:ss.ms
+  (cond ((string-match metrics-tracker--time-format string-value) ; duration as hh:mm:ss.ms
          (let ((h (if (match-string 1 string-value) (string-to-number (match-string 1 string-value)) 0))
                (m (string-to-number (match-string 2 string-value)))
                (s (string-to-number (match-string 3 string-value))))
