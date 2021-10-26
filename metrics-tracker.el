@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.3.9
+;; Version: 0.3.10
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -523,10 +523,10 @@ Return [time] the start date of the next bin."
       ;; suppress daylight savings shifts
       (when (and (not is-dst)
                  (nth 7 next-date-fields))
-        (setq next-date (seq-take (time-subtract next-date (seconds-to-time 3600)) 2)))
+        (setq next-date (time-convert (time-subtract next-date (seconds-to-time 3600)))))
       (when (and is-dst
                  (not (nth 7 next-date-fields)))
-        (setq next-date (seq-take (time-add next-date (seconds-to-time 3600)) 2)))
+        (setq next-date (time-convert (time-add next-date (seconds-to-time 3600)))))
       ;; return next-date
       next-date)))
 
