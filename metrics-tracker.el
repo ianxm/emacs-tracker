@@ -291,7 +291,7 @@ Valid metrics entries look like \"DATE TIME METRICNAME VALUE\" where
                              (equal metric-date end-date)))
                 (funcall action metric-date metric-name metric-value)))
           (metrics-tracker-invalid-value nil) ; the regexes aren't strict enough to filter this out, but it should be skipped
-          (error (format "Error parsing line: %s" line)))))))
+          (error "Error parsing line: %s" line))))))
 
 (defun metrics-tracker--try-read-value (string-value)
   "Read a value from STRING-VALUE, or signal that no value can be read.
@@ -351,10 +351,10 @@ days since the last occurrence of any base metric."
            (today (metrics-tracker--string-to-time))
            (list-filter-fcn (cond ((not (null metrics-tracker-metric-name-whitelist))
                                    (lambda (_date name) ; filter out non-whitelisted metrics
-                                     (seq-contains metrics-tracker-metric-name-whitelist (symbol-name name))))
+                                     (seq-contains-p metrics-tracker-metric-name-whitelist (symbol-name name))))
                                   ((not (null metrics-tracker-metric-name-blacklist))
                                    (lambda (_date name) ; filter out blacklisted metrics
-                                     (not (seq-contains metrics-tracker-metric-name-blacklist (symbol-name name)))))
+                                     (not (seq-contains-p metrics-tracker-metric-name-blacklist (symbol-name name)))))
                                   (t                    ; keep all metrics
                                    (lambda (_date _name) t))))
            (list-action-fcn (lambda (date name _value)
@@ -397,7 +397,7 @@ days since the last occurrence of any base metric."
 
 (defmacro metrics-tracker--validate-input (variable choice options)
   "Validate that VARIABLE was set to a CHOICE that is among the valid OPTIONS."
-  `(if (not (seq-contains ,options ,choice))
+  `(if (not (seq-contains-p ,options ,choice))
        (error (concat ,variable " must be one of: " (mapconcat #'symbol-name ,options ", ")))
      t))
 
@@ -466,8 +466,8 @@ Return [list string] input list but insert dependencies in front
 of the derived metrics that depend on them."
   (let (derived-metric result)
     (dolist (metric-name metric-names)
-      (if (seq-contains cycle-metrics metric-name)
-          (error (format "Cycle detected in derived metric dependency: %s" metric-name)))
+      (if (seq-contains-p cycle-metrics metric-name)
+          (error "Cycle detected in derived metric dependency: %s" metric-name))
       (setq derived-metric (seq-find (lambda (ii) (string= metric-name (car ii)))
                                      metrics-tracker-derived-metrics))
       (if derived-metric
@@ -541,7 +541,7 @@ VALUE-TRANSFORM [symbol] defines an operation to apply to bin values.
 
 Return [number|cons] bin value after merging the new value."
   (cond
-   ((seq-contains '(count percent diff-count diff-percent accum-count) value-transform)
+   ((seq-contains-p '(count percent diff-count diff-percent accum-count) value-transform)
     (1+ (or existing-value 0)))
    ((or (eq value-transform 'min)
         (eq value-transform 'diff-min))
@@ -631,7 +631,7 @@ Return [number|nil] transformed value of the bin."
      ((null value)
       value)
 
-     ((seq-contains '(total min max count diff-total diff-min diff-max diff-count accum accum-count) value-transform)
+     ((seq-contains-p '(total min max count diff-total diff-min diff-max diff-count accum accum-count) value-transform)
       value)
 
      ((or (eq value-transform 'avg)
@@ -687,7 +687,7 @@ Return the bin data as [hash symbol->[hash time->number]]."
          bin-data                                      ; [hash time->number] current bin data used by bin-action-fcn
          effective-date-grouping                       ; [symbol] current date-grouping for binning
          (bin-filter-fcn (lambda (_date name)          ; [fcn] filters diary entries
-                           (seq-contains metric-names-with-deps name)))
+                           (seq-contains-p metric-names-with-deps name)))
          (bin-action-fcn (lambda (date name value)     ; [fcn] puts values in appropriate bins
                            (setq bin-data (gethash name bin-data-all)
                                  date-bin (metrics-tracker--date-to-bin date effective-date-grouping)
@@ -708,7 +708,7 @@ Return the bin data as [hash symbol->[hash time->number]]."
     (setq effective-date-grouping date-grouping) ; revert back to chosen `date-grouping'
 
     ;; compute derived metrics
-    (metrics-tracker--compute-derived-metrics (seq-filter (lambda (ii) (seq-contains derived-metric-names ii)) metric-names-with-deps)
+    (metrics-tracker--compute-derived-metrics (seq-filter (lambda (ii) (seq-contains-p derived-metric-names ii)) metric-names-with-deps)
                                               bin-data-all value-transform)
     (unless (eq date-grouping 'day)
       (metrics-tracker--translate-bins metric-names bin-data-all bin-action-fcn))
@@ -744,11 +744,11 @@ Return the bin data as [hash symbol->[hash time->number]]."
                 (setq current-value (metrics-tracker--bin-to-val ; the value for the current bin
                                      (gethash current-date-bin bin-data 0)
                                      value-transform date-grouping current-date-bin first-date end-date))
-                (cond ((seq-contains '(diff-total diff-min diff-max diff-avg diff-count diff-percent
+                (cond ((seq-contains-p '(diff-total diff-min diff-max diff-avg diff-count diff-percent
                                                   diff-per-day diff-per-week diff-per-month diff-per-year)
                                      value-transform)
                        (setq write-value (- current-value last-value))) ; apply diff
-                      ((seq-contains '(accum accum-count) value-transform)
+                      ((seq-contains-p '(accum accum-count) value-transform)
                        (setq total-value (+ total-value current-value)) ; compute and use total
                        (setq write-value total-value))
                       (t
@@ -826,7 +826,7 @@ VALUE-TRANSFORM [symbol] defines an operation to perform on bin values."
                              dep-metrics))
          float-values value-str)
     ;; for count or percent just sum values, otherwise apply the expression
-    (if (or (seq-contains '(count percent diff-count diff-percent accum-count) value-transform)
+    (if (or (seq-contains-p '(count percent diff-count diff-percent accum-count) value-transform)
             (null expression))
         (apply '+ (seq-remove #'null dep-values))
       (setq float-values (mapcar ; convert values to math-floats for calc
