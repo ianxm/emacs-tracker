@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.3.10
+;; Version: 0.3.11
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -122,7 +122,7 @@ Display a report from this list using `metrics-tracker-show-named-report'."
                         (choice :tag "Start Date     " (const :tag "first occurrence" nil) (string :tag "date string"))
                         (choice :tag "End Date       " (const :tag "last occurrence" nil) (string :tag "date string"))
                         (choice :tag "Graph Type     " (const line) (const bar) (const stacked) (const scatter))
-                        (choice :tag "Graph Output   " (const ascii) (const svg) (const png)))))
+                        (choice :tag "Graph Output   " (const svg) (const png) (const ascii)))))
 
   :group 'metrics-tracker)
 
@@ -1217,7 +1217,7 @@ allow selection of multiple metrics and date ranges."
                                               nil t)))
          (graph-output (intern (completing-read "Graph output: " (metrics-tracker--presorted-options
                                                                   metrics-tracker-graph-output-options)
-                                                nil t nil nil "ascii"))))
+                                                nil t nil nil "svg"))))
 
     (metrics-tracker-graph-render (list metric-names-str date-grouping value-transform
                                         start-date end-date graph-type graph-output))))
