@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.3.13
+;; Version: 0.3.14
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -272,16 +272,20 @@ Valid metrics entries look like \"DATE TIME METRICNAME VALUE\" where
 - METRICNAME is any string, whitespace included
 - VALUE is a decimal number like \"1\" or \"1.2\" or a duration value like \"10:01\" or \"1:20:32.21\""
 
-  (let (metric-name metric-date metric-value)
+  (let (metric-date-str metric-name-str metric-value-str
+        metric-date metric-name metric-value)
     (with-temp-buffer
       (insert-file-contents diary-file)
       (dolist (line (split-string (buffer-string) "\n" t))
         (condition-case nil
             (when (string-match metrics-tracker--entry-format line)
-              (setq metric-date (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
-                                                             (seq-take (parse-time-string (match-string 1 line)) 6)))
-                    metric-name (intern (match-string 2 line) metrics-tracker-metric-names)
-                    metric-value (metrics-tracker--try-read-value (match-string 3 line)))
+              (setq metric-date-str (match-string 1 line) ; with emacs 28 these must be saved immediately
+                    metric-name-str (match-string 2 line)
+                    metric-value-str (match-string 3 line)
+                    metric-date (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
+                                                             (seq-take (parse-time-string metric-date-str) 6)))
+                    metric-name (intern metric-name-str metrics-tracker-metric-names)
+                    metric-value (metrics-tracker--try-read-value metric-value-str))
               (when (and (funcall filter metric-date metric-name)
                          (or (null start-date)
                              (time-less-p start-date metric-date)
