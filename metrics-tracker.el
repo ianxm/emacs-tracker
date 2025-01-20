@@ -48,11 +48,12 @@
 
 (defcustom metrics-tracker-metric-name-whitelist nil
   "List of metric names to include in reports.
+
 If this is specified, only the metrics in this list are
 considered.  All others are filtered out.  If this is set, then
 `metrics-tracker-metric-name-blacklist' has no effect.
 
-For example: '(\"pushups\" \"situps\")"
+For example: \\='(\"pushups\" \"situps\")"
   :type '(list :inline t string)
   :group 'metrics-tracker)
 
@@ -60,13 +61,15 @@ For example: '(\"pushups\" \"situps\")"
   "List of metric names to exclude from reports.
 This is ignored if `metrics-tracker-metric-name-whitelist' is set.
 
-For example: '(\"pushups\" \"situps\")"
+For example: \\='(\"pushups\" \"situps\")"
   :type '(list :inline t string)
   :group 'metrics-tracker)
 
 (defcustom metrics-tracker-graph-colors '(("#1f77b4" "#ff7f0e" "#2ca02c" "#d62728" "#9467bd" "#8c564b" "#e377c2" "#7f7f7f" "#bcbd22" "#17becf")
                                           ("#4d871a" "#81871a" "#87581a" "#1a5a87" "#761a87" "#871a1a" "#833a3a" "#403a83" "#3a7f83" "#83743a"))
-  "Colors to use for each series in graphs.  The first list is used when in light mode; the second list for dark mode."
+  "Colors to use for each series in graphs.
+
+The first list is used when in light mode; the second list for dark mode."
   :type '(list (list :inline t string)  ; light mode colors
                (list :inline t string)) ; dark mode colors
   :group 'metrics-tracker)
@@ -149,12 +152,13 @@ metric."
 
 (defvar metrics-tracker-metric-index nil
   "This is the list of metrics read from the diary file.
+
 It is a list containing: (name count first last) for each metric.
 It is cleared when the metrics-tracker output buffer is killed, forcing
 the diary file to be re-read if the data is needed again.")
 
 (defvar metrics-tracker-tempfiles nil
-  "This is the list of tempfiles (graph images) that have been created during the current session.")
+  "This is the list of tempfiles that have been created during the current session.")
 
 (defvar metrics-tracker-metric-names (make-vector 5 0)
   "This is an obarray of all existing metric names.")
@@ -180,7 +184,9 @@ the diary file to be re-read if the data is needed again.")
   "This is a plist of date-grouping options mapped to value-transform options.")
 
 (defun metrics-tracker--date-grouping-options ()
-  "Pull the list of date-grouping options out of `metrics-tracker-grouping-and-transform-options'."
+  "Load date-grouping options.
+
+Pull options out of `metrics-tracker-grouping-and-transform-options'."
   (seq-filter (lambda (x) (symbolp x)) metrics-tracker-grouping-and-transform-options))
 
 (defun metrics-tracker--value-transform-options (date-grouping)
@@ -192,6 +198,7 @@ the diary file to be re-read if the data is needed again.")
 
 (defun metrics-tracker--graph-options (date-transform)
   "Return the valid graph-options for the given DATE-TRANSFORM.
+
 We have to filter graph-options based on DATE-TRANSFORM because
 line and scatter graphs don't work if there's just one data
 point."
@@ -204,6 +211,7 @@ point."
 
 (defun metrics-tracker--presorted-options (options)
   "Prevent Emacs from sorting OPTIONS.
+
 Some versions of Emacs sort the given options instead of just
 presenting them.
 
@@ -226,6 +234,7 @@ https://emacs.stackexchange.com/questions/41801/how-to-stop-completing-read-ivy-
 
 (defun metrics-tracker--string-to-time (&optional date-str)
   "Return a time value for DATE-STR if given, else for today.
+
 Returned a time value with hours, minutes, seconds zeroed out."
   (apply #'encode-time (mapcar #'(lambda (x) (or x 0)) ; convert nil to 0
                                (seq-take (parse-time-string (or date-str (format-time-string "%F"))) 6))))
@@ -261,6 +270,7 @@ Returned a time value with hours, minutes, seconds zeroed out."
 
 (defun metrics-tracker--process-diary (filter action &optional start-date end-date)
   "Parse the diary file.
+
 For each valid metrics entry found, parse the fields and then
 apply the given FILTER and ACTION.
 
@@ -268,9 +278,11 @@ Optionally, filter out metrics before START-DATE or after END-DATE.
 
 Valid metrics entries look like \"DATE TIME METRICNAME VALUE\" where
 - DATE looks like \"2020-01-01\" or \"Jan 1, 2020\" or \"1 Jan 2020\"
-- TIME (optional, and we ignore it) looks like \"10:30\" or \"10:30a\" or \"10:30 am\"
+- TIME (optional, and we ignore it) looks like
+  \"10:30\" or \"10:30a\" or \"10:30 am\"
 - METRICNAME is any string, whitespace included
-- VALUE is a decimal number like \"1\" or \"1.2\" or a duration value like \"10:01\" or \"1:20:32.21\""
+- VALUE is a decimal number like \"1\" or \"1.2\"
+  or a duration value like \"10:01\" or \"1:20:32.21\""
 
   (let (metric-date-str metric-name-str metric-value-str
         metric-date metric-name metric-value)
@@ -319,6 +331,7 @@ are optional for duration values."
 
 (defun metrics-tracker-clear-data ()
   "Clear cached data and delete tempfiles.
+
 Clear the data cached in `metrics-tracker-metric-index' in order to force
 it to be re-read from the diary file the next time it is
 needed.  Also delete the tempfiles (graph images) listed in
@@ -329,7 +342,9 @@ needed.  Also delete the tempfiles (graph images) listed in
     (remove-hook 'kill-buffer-hook #'metrics-tracker-clear-data)))
 
 (defun metrics-tracker-remove-tempfiles ()
-  "Remove any tempfiles (graph images) that were created during the current session."
+  "Remove any tempfiles that were created during the current session.
+
+Tempfiles are used for graph images."
   (dolist (elt metrics-tracker-tempfiles)
     (if (file-exists-p elt)
         (delete-file elt)))
@@ -338,6 +353,7 @@ needed.  Also delete the tempfiles (graph images) listed in
 
 (defun metrics-tracker--load-index ()
   "Make sure the metric index has been populated.
+
 This reads the diary file and populated in
 `metrics-tracker-metric-list' if it is nil.
 
@@ -345,7 +361,7 @@ This reads the diary file and populated in
 
   \(metric-name count first last daysago)
 
-sorted by 'last'.  For derived metrics, each field applies to
+sorted by `last'.  For derived metrics, each field applies to
 each base metric.  For example, `count' is the count of
 occurrences of all base metrics, and `daysago' is the number of
 days since the last occurrence of any base metric."
@@ -504,6 +520,7 @@ DATE-GROUPING [symbol] defines bin size."
 
 (defun metrics-tracker--date-to-next-bin (cdate date-grouping)
   "Advance to the bin following CDATE.
+
 This can be used to advance through the calendar stepping by DATE-GROUPING.
 
 CDATE [time] any date.
@@ -529,12 +546,14 @@ Return [time] the start date of the next bin."
       (cond ((and (not cdst) ndst)
              (setq ndate (seq-take
                               (time-convert
-                               (time-subtract ndate (seconds-to-time 3600)))
+                               (time-subtract ndate (seconds-to-time 3600))
+                               nil)
                               2)))
             ((and cdst (not ndst))
              (setq ndate (seq-take
                               (time-convert
-                               (time-add ndate (seconds-to-time 3600)))
+                               (time-add ndate (seconds-to-time 3600))
+                               nil)
                               2))))
       ;; return ndate
       ndate)))
@@ -930,7 +949,7 @@ TABLE-CONFIG [list] should contain all inputs needed to render a table.
 Date strings can be in any format `parse-time-string' can use.
 
 For example:
-    '((\"metricname\") year total nil nil)"
+    \\='((\"metricname\") year total nil nil)"
 
   ;; make sure `metrics-tracker-metric-index' has been populated
   (metrics-tracker--load-index)
@@ -1018,7 +1037,7 @@ Return [list string] report labels."
           metric-names-str))
 
 (defun metrics-tracker--format-data (metric-names bin-data-all date-grouping start-date end-date graph-type)
-  "Return a list of '(date-str [date-str metric1 ...]) formed from bin data.
+  "Return a list of \\='(date-str [date-str metric1 ...]) formed from bin data.
 
 METRIC-NAMES [list symbol] is the list of chosen metrics.
 
@@ -1030,7 +1049,7 @@ START-DATE [time] if given, filter occurrences before.
 
 END-DATE [time] if given, filter occurrences after.
 
-GRAPH-TYPE [symbol] is the selected graph type, if the current operation is a graph."
+GRAPH-TYPE [symbol] is the selected graph type, for graph operations."
   (let ((filler (cond ((eq graph-type 'line) ".")    ; line graphs
                       ((eq graph-type 'scatter) ".") ; scatter graphs
                       ((not (null graph-type)) "0")  ; other graphs
@@ -1106,7 +1125,7 @@ CAL-CONFIG [list] should contain all inputs needed to generate the calendar.
 Date strings must be in YYYY-MM-DD format.
 
 For example:
-    '((\"metricname\") total nil nil)"
+    \\='((\"metricname\") total nil nil)"
 
   ;; make sure `metrics-tracker-metric-index' has been populated
   (metrics-tracker--load-index)
@@ -1246,7 +1265,9 @@ GRAPH-CONFIG [list] should be a list of all inputs needed to render a graph.
 Date strings must be in YYYY-MM-DD format.
 
 For example:
-    '((\"metricname\") year total nil nil line svg)"
+    \\='((\"metricname\") year total nil nil line svg)
+
+REPORT-NAME is a name to save as a named report."
 
   (metrics-tracker--check-gnuplot-exists)
 
