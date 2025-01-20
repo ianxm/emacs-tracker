@@ -4,7 +4,7 @@
 
 ;; Author: Ian Martins <ianxm@jhu.edu>
 ;; URL: https://github.com/ianxm/emacs-tracker
-;; Version: 0.3.14
+;; Version: 0.3.15
 ;; Keywords: calendar
 ;; Package-Requires: ((emacs "24.4") (seq "2.3"))
 
@@ -254,9 +254,9 @@ Returned a time value with hours, minutes, seconds zeroed out."
 
 (defconst metrics-tracker--time-format
   (rx line-start
-      (opt (group (repeat 1 2 digit)) ?:)        ; hh:
+      (opt (group (repeat 1 2 digit)) ?:)               ; hh:
       (group (repeat 1 2 digit)) ?: (group (= 2 digit)) ; mm:ss
-      (opt ?. (1+ digit))                        ; .ms
+      (opt ?. (1+ digit))                               ; .ms
       line-end))
 
 (defun metrics-tracker--process-diary (filter action &optional start-date end-date)
@@ -502,37 +502,42 @@ DATE-GROUPING [symbol] defines bin size."
                    (nth 4 date-fields)
                    (nth 5 date-fields)))))
 
-(defun metrics-tracker--date-to-next-bin (date date-grouping)
-  "Advance to the bin following DATE.
+(defun metrics-tracker--date-to-next-bin (cdate date-grouping)
+  "Advance to the bin following CDATE.
 This can be used to advance through the calendar stepping by DATE-GROUPING.
 
-DATE [time] any date.
+CDATE [time] any date.
 
 DATE-GROUPING [symbol] defines bin size.
 
 Return [time] the start date of the next bin."
   (if (eq date-grouping 'full)
       'full
-    (let* ((date-fields (decode-time date))
-           (is-dst (nth 7 date-fields))
-           (next-date-fields date-fields)
-           next-date)
+    (let* ((cdate-fields (decode-time cdate))
+           (cdst (nth 7 cdate-fields))
+           (ndate-fields cdate-fields)
+           ndate ndst)
       (pcase date-grouping
-       (`day (setcar (nthcdr 3 next-date-fields) (1+ (nth 3 next-date-fields))))
-       (`week (setcar (nthcdr 3 next-date-fields) (+ 7 (nth 3 next-date-fields))))
-       (`month (setcar (nthcdr 4 next-date-fields) (1+ (nth 4 next-date-fields))))
-       (`year (setcar (nthcdr 5 next-date-fields) (1+ (nth 5 next-date-fields)))))
-      (setq next-date (apply #'encode-time next-date-fields))
-      (setq next-date-fields (decode-time next-date))
+       (`day (setcar (nthcdr 3 ndate-fields) (1+ (nth 3 ndate-fields))))
+       (`week (setcar (nthcdr 3 ndate-fields) (+ 7 (nth 3 ndate-fields))))
+       (`month (setcar (nthcdr 4 ndate-fields) (1+ (nth 4 ndate-fields))))
+       (`year (setcar (nthcdr 5 ndate-fields) (1+ (nth 5 ndate-fields)))))
+      (setq ndate (apply #'encode-time ndate-fields)
+            ndate-fields (decode-time ndate)
+            ndst (nth 7 ndate-fields))
       ;; suppress daylight savings shifts
-      (when (and (not is-dst)
-                 (nth 7 next-date-fields))
-        (setq next-date (time-convert (time-subtract next-date (seconds-to-time 3600)))))
-      (when (and is-dst
-                 (not (nth 7 next-date-fields)))
-        (setq next-date (time-convert (time-add next-date (seconds-to-time 3600)))))
-      ;; return next-date
-      next-date)))
+      (cond ((and (not cdst) ndst)
+             (setq ndate (seq-take
+                              (time-convert
+                               (time-subtract ndate (seconds-to-time 3600)))
+                              2)))
+            ((and cdst (not ndst))
+             (setq ndate (seq-take
+                              (time-convert
+                               (time-add ndate (seconds-to-time 3600)))
+                              2))))
+      ;; return ndate
+      ndate)))
 
 (defun metrics-tracker--val-to-bin (value existing-value value-transform)
   "Merge a new VALUE into a bin.
@@ -725,7 +730,7 @@ Return the bin data as [hash symbol->[hash time->number]]."
     (dolist (metric-name metric-names)
       (let* ((first-date (nth 2 (nth 0 (seq-filter                ; [time] first date of metric data as a time value
                                         (lambda (item) (eq (car item) metric-name)) metrics-tracker-metric-index))))
-             (first-date-bin (metrics-tracker--date-to-bin        ; [time] date bin containing first date
+             (first-date-bin (metrics-tracker--date-to-bin        ; [time] date bin containing `first-date'
                               first-date date-grouping))
              (end-date-bin (metrics-tracker--date-to-bin end-date ; [time] date bin containing the `end-date'
                                                       date-grouping))
@@ -736,11 +741,11 @@ Return the bin data as [hash symbol->[hash time->number]]."
                      (metrics-tracker--bin-to-val (gethash 'full bin-data) value-transform date-grouping 'full first-date end-date)
                      bin-data)
           (let* ((current-date-bin first-date-bin)
-                 (last-value (metrics-tracker--bin-to-val        ; the value from the last bin we visited
+                 (last-value (metrics-tracker--bin-to-val ; the value from the last bin we visited
                               (gethash current-date-bin bin-data) value-transform date-grouping current-date-bin first-date end-date))
-                 (total-value 0)                                 ; the total so far if we're accumulating
-                 current-value                                   ; the value from the bin we're currently visiting
-                 write-value)                                    ; the value to write for the current bin
+                 (total-value 0) ; the total so far if we're accumulating
+                 current-value ; the value from the bin we're currently visiting
+                 write-value) ; the value to write for the current bin
             (while (or (time-less-p current-date-bin end-date-bin)
                        (equal current-date-bin end-date-bin))
               (when (or (gethash current-date-bin bin-data)
@@ -749,8 +754,8 @@ Return the bin data as [hash symbol->[hash time->number]]."
                                      (gethash current-date-bin bin-data 0)
                                      value-transform date-grouping current-date-bin first-date end-date))
                 (cond ((seq-contains-p '(diff-total diff-min diff-max diff-avg diff-count diff-percent
-                                                  diff-per-day diff-per-week diff-per-month diff-per-year)
-                                     value-transform)
+                                                    diff-per-day diff-per-week diff-per-month diff-per-year)
+                                       value-transform)
                        (setq write-value (- current-value last-value))) ; apply diff
                       ((seq-contains-p '(accum accum-count) value-transform)
                        (setq total-value (+ total-value current-value)) ; compute and use total
@@ -759,7 +764,7 @@ Return the bin data as [hash symbol->[hash time->number]]."
                        (setq write-value current-value)))
 
                 (puthash current-date-bin write-value bin-data))
-              (setq last-value current-value                        ; save last value for diff
+              (setq last-value current-value ; save last value for diff
                     current-date-bin (metrics-tracker--date-to-next-bin current-date-bin date-grouping))))))) ; increment to next bin
     bin-data-all))
 
